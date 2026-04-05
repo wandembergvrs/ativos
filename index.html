@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel DI - Curva e Projeções</title>
+  <title>Painel DI e Prefixados - Curva e Projeções</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
@@ -227,11 +227,11 @@
 <body>
   <div class="container">
     <section class="hero">
-      <h1>Painel DI - Curva, Emissão e Projeções</h1>
+      <h1>Painel DI e Prefixados - Curva, Emissão e Projeções</h1>
       <p>
         Este painel roda inteiramente no navegador. Você envia apenas a planilha <code>.xlsx</code>, e o sistema
         busca automaticamente o arquivo <code>serie_cdi.csv</code> salvo no próprio repositório. A aplicação filtra
-        os ativos indexados a DI, estima o percentual do CDI e projeta a curva para 6, 12, 18, 24, 36, 48 e 60 meses
+        os ativos indexados a DI e PREFIXADO, estima o percentual do CDI ou a taxa prefixada implícita e projeta a curva para 6, 12, 18, 24, 36, 48 e 60 meses
         usando a última taxa diária disponível nesse CSV como constante. Se o CSV não tiver o dado mais recente do mercado,
         o painel usa automaticamente a última data disponível dentro dele.
       </p>
@@ -240,6 +240,7 @@
         <span class="pill">Sem backend</span>
         <span class="pill">Upload local só do XLSX</span>
         <span class="pill">CDI lido de serie_cdi.csv</span>
+        <span class="pill">Inclui DI e PREFIXADO</span>
       </div>
     </section>
 
@@ -291,6 +292,14 @@
           </select>
         </div>
         <div class="field">
+          <label for="filtroIndexador">Indexador</label>
+          <select id="filtroIndexador">
+            <option value="">Todos</option>
+            <option value="DI">DI</option>
+            <option value="PREFIXADO">PREFIXADO</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="filtroOrdenar">Ordenar por</label>
           <select id="filtroOrdenar">
             <option value="Nome do ativo">Nome do ativo</option>
@@ -303,6 +312,8 @@
             <option value="Valor proj 48m">Valor em 48 meses</option>
             <option value="Valor proj 60m">Valor em 60 meses</option>
             <option value="% CDI estimado">% CDI estimado</option>
+            <option value="Taxa prefixada estimada (% a.a.)">Taxa prefixada estimada</option>
+            <option value="Taxa equivalente anual histórica (%)">Taxa equivalente anual</option>
           </select>
         </div>
         <div class="field">
@@ -313,6 +324,11 @@
           </select>
         </div>
       </div>
+    </section>
+
+    <section id="painelTotalizacao" class="card hidden" style="margin-bottom: 16px;">
+      <h2>Totalização do filtro atual</h2>
+      <div id="totalizacaoGrid" class="grid grid-4"></div>
     </section>
 
     <section id="painelTabela" class="card hidden">
@@ -346,11 +362,14 @@
 
     const TABLE_COLUMNS = [
       'Nome do ativo',
+      'Indexador',
       'Emissor filtro',
       'Código',
       'Preço Atualizado CURVA',
       'Valor Atualizado CURVA',
       '% CDI estimado',
+      'Taxa prefixada estimada (% a.a.)',
+      'Taxa equivalente anual histórica (%)',
       'Valor proj 6m',
       'Valor proj 12m',
       'Valor proj 18m',
@@ -365,6 +384,8 @@
       'Preço Atualizado CURVA',
       'Valor Atualizado CURVA',
       '% CDI estimado',
+      'Taxa prefixada estimada (% a.a.)',
+      'Taxa equivalente anual histórica (%)',
       'Valor proj 6m',
       'Valor proj 12m',
       'Valor proj 18m',
@@ -385,9 +406,12 @@
       status: document.getElementById('status'),
       painelResumo: document.getElementById('painelResumo'),
       painelFiltros: document.getElementById('painelFiltros'),
+      painelTotalizacao: document.getElementById('painelTotalizacao'),
+      totalizacaoGrid: document.getElementById('totalizacaoGrid'),
       painelTabela: document.getElementById('painelTabela'),
       filtroBusca: document.getElementById('filtroBusca'),
       filtroEmissor: document.getElementById('filtroEmissor'),
+      filtroIndexador: document.getElementById('filtroIndexador'),
       filtroOrdenar: document.getElementById('filtroOrdenar'),
       filtroDirecao: document.getElementById('filtroDirecao'),
       tabelaHead: document.querySelector('#tabelaResultados thead'),
@@ -434,6 +458,36 @@
 
     function chooseFirstExisting(columns, preferences) {
       return preferences.find(c => columns.includes(c)) || null;
+    }
+
+    function normalizarIndexador(valor) {
+      const s = String(valor ?? '').trim().toUpperCase();
+      if (['PRÉ', 'PRE', 'PRÉ-FIXADO', 'PRE-FIXADO', 'PREFIXADO'].includes(s)) return 'PREFIXADO';
+      if (s === 'DI') return 'DI';
+      return s;
+    }
+
+    function isIndexadorProcessavel(valor) {
+      return ['DI', 'PREFIXADO'].includes(normalizarIndexador(valor));
+    }
+
+    function equivalenteAnual(razaoPu, nDiasUteis) {
+      if (!Number.isFinite(razaoPu) || razaoPu <= 0 || !Number.isFinite(nDiasUteis) || nDiasUteis <= 0) return NaN;
+      return (Math.pow(razaoPu, 252 / nDiasUteis) - 1) * 100;
+    }
+
+    function estimarPrefixado(valorUnitario, puObservado, nDiasUteis) {
+      if (!Number.isFinite(valorUnitario) || !Number.isFinite(puObservado) || !Number.isFinite(nDiasUteis) || nDiasUteis <= 0) {
+        return { taxaDiaria: NaN, taxaAnual: NaN, pu: NaN, erro: NaN };
+      }
+      const razao = puObservado / valorUnitario;
+      if (!Number.isFinite(razao) || razao <= 0) {
+        return { taxaDiaria: NaN, taxaAnual: NaN, pu: NaN, erro: NaN };
+      }
+      const taxaDiaria = Math.pow(razao, 1 / nDiasUteis) - 1;
+      const taxaAnual = (Math.pow(1 + taxaDiaria, 252) - 1) * 100;
+      const pu = valorUnitario * Math.pow(1 + taxaDiaria, nDiasUteis);
+      return { taxaDiaria, taxaAnual, pu, erro: pu - puObservado };
     }
 
     function inferirValorUnitario(valorAtualizadoCurva, qtdDisponivel) {
@@ -655,7 +709,7 @@
 
       return rows.map(r => {
         const row = { ...r };
-        row['Indexador'] = String(row['Indexador'] ?? '').trim().toUpperCase();
+        row['Indexador'] = normalizarIndexador(row['Indexador']);
         row['Data de Emissão'] = excelDateToISO(row['Data de Emissão']);
         row['Vencimento'] = excelDateToISO(row['Vencimento']);
         for (const col of [
@@ -688,20 +742,21 @@
     }
 
     function processar(dfPosicao, dfCdi, dataRefManual) {
-      const dfDi = dfPosicao.filter(r => r['Indexador'] === 'DI');
-      console.log('Total DI na planilha:', dfDi.length);
-      console.log('Datas de emissão válidas:', dfDi.filter(r => r['Data de Emissão']).length);
+      const dfProcessaveis = dfPosicao.filter(r => isIndexadorProcessavel(r['Indexador']));
+      console.log('Total processáveis na planilha:', dfProcessaveis.length);
 
-      if (!dfDi.length) throw new Error('Não há ativos com Indexador = DI na planilha enviada.');
+      if (!dfProcessaveis.length) {
+        throw new Error('Não há ativos DI ou PREFIXADO na planilha enviada.');
+      }
 
-      const dataMinima = dfDi
+      const dataMinima = dfProcessaveis
         .map(r => r['Data de Emissão'])
         .filter(Boolean)
         .map(d => new Date(d))
         .sort((a, b) => a - b)[0];
 
       if (!dataMinima || Number.isNaN(dataMinima.getTime())) {
-        throw new Error('Não foi possível identificar uma Data de Emissão válida para os ativos DI.');
+        throw new Error('Não foi possível identificar uma Data de Emissão válida para os ativos processáveis.');
       }
 
       const cdiFiltrado = dfCdi.filter(r => new Date(r.data) >= dataMinima);
@@ -714,27 +769,51 @@
       const taxaDiariaRef = linhaRef.taxa_diaria_decimal;
       const taxaAnualRef = linhaRef.taxa_anual_percentual;
 
-      const columns = Object.keys(dfDi[0]);
+      const columns = Object.keys(dfProcessaveis[0]);
       const colNomeAtivo = chooseFirstExisting(columns, ['Ativo', 'Nome do Ativo', 'Produto', 'Código']);
       const colEmissor = chooseFirstExisting(columns, ['Emissor', 'Instituição']);
 
       const resultado = [];
 
-      for (const row of dfDi) {
+      for (const row of dfProcessaveis) {
+        const indexador = normalizarIndexador(row['Indexador']);
         const qtdDisp = row['Quantidade Disponível'];
         const valorCurva = row['Valor Atualizado CURVA'];
         const precoCurva = row['Preço Atualizado CURVA'];
         const dataEmissao = row['Data de Emissão'];
         const vencimento = row['Vencimento'];
 
-        if (!dataEmissao || !Number.isFinite(qtdDisp) || qtdDisp <= 0) continue;
+        if (!dataEmissao || !Number.isFinite(qtdDisp) || qtdDisp <= 0 || !Number.isFinite(precoCurva) || !Number.isFinite(valorCurva)) continue;
 
         const valorUnitario = inferirValorUnitario(valorCurva, qtdDisp);
-        const taxasDiarias = cdiFiltrado
-          .filter(r => new Date(r.data) > new Date(dataEmissao) && new Date(r.data) <= new Date(dataRefEfetiva))
-          .map(r => r.taxa_diaria_decimal);
+        if (!Number.isFinite(valorUnitario) || valorUnitario <= 0) continue;
 
-        const estimativa = estimarFatorEmissao(valorUnitario, precoCurva, taxasDiarias);
+        const nDiasHistoricos = busdayCount(dataEmissao, dataRefEfetiva);
+        const taxaEquivalenteAnual = equivalenteAnual(precoCurva / valorUnitario, nDiasHistoricos);
+
+        let fatorCdi = NaN;
+        let taxaPrefixadaAnual = NaN;
+        let taxaProjecaoDiaria = NaN;
+        let puHistoricoModelado = NaN;
+        let erroHistorico = NaN;
+
+        if (indexador === 'DI') {
+          const taxasDiarias = cdiFiltrado
+            .filter(r => new Date(r.data) > new Date(dataEmissao) && new Date(r.data) <= new Date(dataRefEfetiva))
+            .map(r => r.taxa_diaria_decimal);
+
+          const estimativa = estimarFatorEmissao(valorUnitario, precoCurva, taxasDiarias);
+          fatorCdi = estimativa.fator;
+          puHistoricoModelado = estimativa.pu;
+          erroHistorico = estimativa.erro;
+          taxaProjecaoDiaria = Number.isFinite(fatorCdi) ? fatorCdi * taxaDiariaRef : NaN;
+        } else if (indexador === 'PREFIXADO') {
+          const estimativaPre = estimarPrefixado(valorUnitario, precoCurva, nDiasHistoricos);
+          taxaPrefixadaAnual = estimativaPre.taxaAnual;
+          puHistoricoModelado = estimativaPre.pu;
+          erroHistorico = estimativaPre.erro;
+          taxaProjecaoDiaria = estimativaPre.taxaDiaria;
+        }
 
         const item = {
           'Nome do ativo': row[colNomeAtivo] ?? row['Código'] ?? row['Produto'] ?? '-',
@@ -743,7 +822,7 @@
           'Produto': row['Produto'] ?? '-',
           'Instituição': row['Instituição'] ?? '-',
           'Emissor': row['Emissor'] ?? '-',
-          'Indexador': row['Indexador'],
+          'Indexador': indexador,
           'Data de Emissão': dataEmissao,
           'Vencimento': vencimento,
           'Quantidade': row['Quantidade'],
@@ -754,12 +833,14 @@
           'Data ref CDI': dataRefEfetiva,
           'CDI anual da data ref (%)': taxaAnualRef,
           'CDI diário da data ref': taxaDiariaRef,
-          'N dias CDI históricos': taxasDiarias.length,
-          'Fator emissão (decimal)': estimativa.fator,
-          '% CDI estimado': Number.isFinite(estimativa.fator) ? estimativa.fator * 100 : NaN,
-          'PU modelado histórico': estimativa.pu,
-          'Erro PU histórico': estimativa.erro,
-          'Erro absoluto histórico': Number.isFinite(estimativa.erro) ? Math.abs(estimativa.erro) : NaN,
+          'N dias históricos': nDiasHistoricos,
+          'Fator emissão (decimal)': fatorCdi,
+          '% CDI estimado': Number.isFinite(fatorCdi) ? fatorCdi * 100 : NaN,
+          'Taxa prefixada estimada (% a.a.)': taxaPrefixadaAnual,
+          'Taxa equivalente anual histórica (%)': taxaEquivalenteAnual,
+          'PU modelado histórico': puHistoricoModelado,
+          'Erro PU histórico': erroHistorico,
+          'Erro absoluto histórico': Number.isFinite(erroHistorico) ? Math.abs(erroHistorico) : NaN,
         };
 
         for (const meses of [6, 12, 18, 24, 36, 48, 60]) {
@@ -772,7 +853,7 @@
             item[`Valor proj ${meses}m`] = NaN;
           } else {
             const dias = busdayCount(dataRefEfetiva, dataFutura);
-            const puProj = projetarPuFuturo(precoCurva, estimativa.fator, taxaDiariaRef, dias);
+            const puProj = projetarPuFuturo(precoCurva, 1, taxaProjecaoDiaria, dias);
             item[`Dias úteis proj ${meses}m`] = dias;
             item[`PU proj ${meses}m`] = puProj;
             item[`Valor proj ${meses}m`] = Number.isFinite(puProj) && Number.isFinite(qtdDisp)
@@ -793,23 +874,41 @@
         return ea - eb;
       });
 
-      return { resultado, dfDi, cdiFiltrado, dataRefEfetiva };
+      return { resultado, dfProcessaveis, cdiFiltrado, dataRefEfetiva };
     }
 
     function renderResumo(rows, dataRefEfetiva) {
       const soma = (campo) => rows.reduce((acc, r) => acc + (Number.isFinite(r[campo]) ? r[campo] : 0), 0);
+      const diCount = rows.filter(r => r['Indexador'] === 'DI').length;
+      const preCount = rows.filter(r => r['Indexador'] === 'PREFIXADO').length;
       const html = [
-        cardResumo('Ativos DI', String(rows.length), `Data de referência: ${brDate(dataRefEfetiva)}`),
+        cardResumo('Ativos filtrados', String(rows.length), `Data de referência: ${brDate(dataRefEfetiva)}`),
+        cardResumo('DI no filtro', String(diCount), 'Quantidade de ativos DI no recorte atual'),
+        cardResumo('Prefixados no filtro', String(preCount), 'Quantidade de ativos prefixados no recorte atual'),
         cardResumo('Valor na curva', `R$ ${brNumber(soma('Valor Atualizado CURVA'))}`, 'Soma dos valores atuais na curva'),
-        cardResumo('Valor projetado 6m', `R$ ${brNumber(soma('Valor proj 6m'))}`, 'Soma do horizonte de 6 meses'),
         cardResumo('Valor projetado 12m', `R$ ${brNumber(soma('Valor proj 12m'))}`, 'Soma do horizonte de 12 meses'),
-        cardResumo('Valor projetado 24m', `R$ ${brNumber(soma('Valor proj 24m'))}`, 'Soma do horizonte de 24 meses'),
         cardResumo('Valor projetado 60m', `R$ ${brNumber(soma('Valor proj 60m'))}`, 'Soma do horizonte de 60 meses'),
-        cardResumo('% CDI médio', `${brNumber(mediaCampo(rows, '% CDI estimado'))}%`, 'Média simples das estimativas'),
-        cardResumo('Maior emissor filtrado', topEmissor(rows), 'Maior contagem no recorte atual'),
+        cardResumo('% CDI médio', `${brNumber(mediaCampo(rows, '% CDI estimado'))}%`, 'Média simples apenas dos ativos DI'),
+        cardResumo('Taxa prefixada média', `${brNumber(mediaCampo(rows, 'Taxa prefixada estimada (% a.a.)'))}%`, 'Média simples apenas dos prefixados'),
       ].join('');
       el.painelResumo.innerHTML = html;
       el.painelResumo.classList.remove('hidden');
+    }
+
+    function renderTotalizacao(rows) {
+      const soma = (campo) => rows.reduce((acc, r) => acc + (Number.isFinite(r[campo]) ? r[campo] : 0), 0);
+      const html = [
+        cardResumo('Total de ativos', String(rows.length), 'Total do recorte filtrado'),
+        cardResumo('Total na curva', `R$ ${brNumber(soma('Valor Atualizado CURVA'))}`, 'Soma dos valores atuais'),
+        cardResumo('Total em 6 meses', `R$ ${brNumber(soma('Valor proj 6m'))}`, 'Soma do horizonte de 6 meses'),
+        cardResumo('Total em 12 meses', `R$ ${brNumber(soma('Valor proj 12m'))}`, 'Soma do horizonte de 12 meses'),
+        cardResumo('Total em 18 meses', `R$ ${brNumber(soma('Valor proj 18m'))}`, 'Soma do horizonte de 18 meses'),
+        cardResumo('Total em 24 meses', `R$ ${brNumber(soma('Valor proj 24m'))}`, 'Soma do horizonte de 24 meses'),
+        cardResumo('Total em 36 meses', `R$ ${brNumber(soma('Valor proj 36m'))}`, 'Soma do horizonte de 36 meses'),
+        cardResumo('Total em 60 meses', `R$ ${brNumber(soma('Valor proj 60m'))}`, 'Soma do horizonte de 60 meses'),
+      ].join('');
+      el.totalizacaoGrid.innerHTML = html;
+      el.painelTotalizacao.classList.remove('hidden');
     }
 
     function mediaCampo(rows, campo) {
@@ -852,6 +951,9 @@
       el.filtroEmissor.innerHTML = '<option value="">Todos</option>' +
         emissores.map(e => `<option value="${escapeHtml(String(e))}">${escapeHtml(String(e))}</option>`).join('');
 
+      el.filtroIndexador.innerHTML = '<option value="">Todos</option>' +
+        ['DI', 'PREFIXADO'].map(e => `<option value="${e}">${e}</option>`).join('');
+
       el.painelFiltros.classList.remove('hidden');
     }
 
@@ -866,6 +968,7 @@
     function applyFilters() {
       const busca = (el.filtroBusca.value || '').toLowerCase().trim();
       const emissor = el.filtroEmissor.value || '';
+      const indexador = el.filtroIndexador.value || '';
       state.sortColumn = el.filtroOrdenar.value;
       state.sortDirection = el.filtroDirecao.value;
 
@@ -886,12 +989,17 @@
         rows = rows.filter(r => String(r['Emissor filtro'] ?? '') === emissor);
       }
 
+      if (indexador) {
+        rows = rows.filter(r => String(r['Indexador'] ?? '') === indexador);
+      }
+
       const col = state.sortColumn;
       const dir = state.sortDirection === 'desc' ? -1 : 1;
       rows.sort((a, b) => compareValues(a[col], b[col]) * dir);
 
       state.filtered = rows;
       renderResumo(rows, rows[0]?.['Data ref CDI'] || state.dfResultado[0]?.['Data ref CDI']);
+      renderTotalizacao(rows);
       renderTable(rows);
     }
 
@@ -947,7 +1055,7 @@
       const ws2 = XLSX.utils.json_to_sheet(state.dfDi);
       const ws3 = XLSX.utils.json_to_sheet(state.dfCdi);
       XLSX.utils.book_append_sheet(wb, ws1, 'Estimativa');
-      XLSX.utils.book_append_sheet(wb, ws2, 'Ativos_DI');
+      XLSX.utils.book_append_sheet(wb, ws2, 'Ativos_Processaveis');
       XLSX.utils.book_append_sheet(wb, ws3, 'Serie_CDI');
       XLSX.writeFile(wb, 'estimativa_taxa_emissao_di.xlsx');
     }
@@ -960,8 +1068,10 @@
       el.arquivoPosicao.value = '';
       el.filtroBusca.value = '';
       el.filtroEmissor.innerHTML = '<option value="">Todos</option>';
+      el.filtroIndexador.innerHTML = '<option value="">Todos</option>';
       el.painelResumo.classList.add('hidden');
       el.painelFiltros.classList.add('hidden');
+      el.painelTotalizacao.classList.add('hidden');
       el.painelTabela.classList.add('hidden');
       el.tabelaHead.innerHTML = '';
       el.tabelaBody.innerHTML = '';
@@ -976,7 +1086,7 @@
         }
 
         el.btnProcessar.disabled = true;
-        setStatus('Lendo a planilha, carregando serie_cdi.csv do repositório e processando os ativos DI...');
+        setStatus('Lendo a planilha, carregando serie_cdi.csv do repositório e processando os ativos DI e PREFIXADO...');
 
         const { rows: posRows, actualSheet } = await readExcel(
           el.arquivoPosicao.files[0],
@@ -988,10 +1098,10 @@
         const dfCdi = prepararDfCdi(cdiRows);
         const dataRefManual = el.dataRef.value || null;
 
-        const { resultado, dfDi, cdiFiltrado, dataRefEfetiva } = processar(dfPosicao, dfCdi, dataRefManual);
+        const { resultado, dfProcessaveis, cdiFiltrado, dataRefEfetiva } = processar(dfPosicao, dfCdi, dataRefManual);
 
         state.dfResultado = resultado;
-        state.dfDi = dfDi;
+        state.dfDi = dfProcessaveis;
         state.dfCdi = cdiFiltrado;
         state.sortColumn = 'Nome do ativo';
         state.sortDirection = 'asc';
@@ -1002,8 +1112,8 @@
 
         setStatus(
           `Processamento concluído. Aba usada: ${actualSheet}. ` +
-          `Ativos DI encontrados na planilha: ${dfDi.length}. ` +
-          `Ativos DI exibidos após processamento: ${resultado.length}. ` +
+          `Ativos DI e PREFIXADO encontrados na planilha: ${dfProcessaveis.length}. ` +
+          `Ativos exibidos após processamento: ${resultado.length}. ` +
           `Série CDI carregada de ${state.cdiCsvPath}: ${cdiFiltrado.length} registros. ` +
           `Última data disponível usada como referência: ${brDate(dataRefEfetiva)}.`
         );
@@ -1019,6 +1129,7 @@
     el.btnLimpar.addEventListener('click', limparTudo);
     el.filtroBusca.addEventListener('input', applyFilters);
     el.filtroEmissor.addEventListener('change', applyFilters);
+    el.filtroIndexador.addEventListener('change', applyFilters);
     el.filtroOrdenar.addEventListener('change', applyFilters);
     el.filtroDirecao.addEventListener('change', applyFilters);
   </script>
