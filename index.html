@@ -490,11 +490,39 @@
       return { taxaDiaria, taxaAnual, pu, erro: pu - puObservado };
     }
 
-    function inferirValorUnitario(valorAtualizadoCurva, qtdDisponivel) {
-      if (!Number.isFinite(valorAtualizadoCurva) || !Number.isFinite(qtdDisponivel) || qtdDisponivel <= 0) return NaN;
-      const ratio = valorAtualizadoCurva / qtdDisponivel;
-      const candidates = [1, 100, 1000];
-      return candidates.reduce((best, curr) => Math.abs(curr - ratio) < Math.abs(best - ratio) ? curr : best, candidates[0]);
+    function inferirValorUnitario(valorAtualizadoCurva, qtdDisponivel, precoCurva) {
+      const candidates = [1, 100, 500, 1000];
+
+      const nearest = (value) => {
+        if (!Number.isFinite(value) || value <= 0) return NaN;
+        return candidates.reduce(
+          (best, curr) => Math.abs(curr - value) < Math.abs(best - value) ? curr : best,
+          candidates[0]
+        );
+      };
+
+      if (Number.isFinite(precoCurva) && precoCurva > 0) {
+        const nearPrice = nearest(precoCurva);
+        const diffPct = Math.abs(precoCurva - nearPrice) / nearPrice;
+        if (diffPct <= 0.08) return nearPrice;
+      }
+
+      if (Number.isFinite(valorAtualizadoCurva) && Number.isFinite(qtdDisponivel) && qtdDisponivel > 0) {
+        const ratio = valorAtualizadoCurva / qtdDisponivel;
+
+        const qtdSuspeita = !Number.isSafeInteger(qtdDisponivel) || qtdDisponivel > 1e12;
+        const ratioSuspeito = !Number.isFinite(ratio) || ratio <= 0 || ratio < 0.5 || ratio > 2000;
+
+        if (!qtdSuspeita && !ratioSuspeito) {
+          return nearest(ratio);
+        }
+      }
+
+      if (Number.isFinite(precoCurva) && precoCurva > 0) {
+        return nearest(precoCurva);
+      }
+
+      return NaN;
     }
 
     function puModelado(valorUnitario, taxasDiarias, fator) {
@@ -785,7 +813,7 @@
 
         if (!dataEmissao || !Number.isFinite(qtdDisp) || qtdDisp <= 0 || !Number.isFinite(precoCurva) || !Number.isFinite(valorCurva)) continue;
 
-        const valorUnitario = inferirValorUnitario(valorCurva, qtdDisp);
+        const valorUnitario = inferirValorUnitario(valorCurva, qtdDisp, precoCurva);
         if (!Number.isFinite(valorUnitario) || valorUnitario <= 0) continue;
 
         const nDiasHistoricos = busdayCount(dataEmissao, dataRefEfetiva);
