@@ -45,7 +45,7 @@
       margin-bottom: 20px;
     }
 
-    .hero p { color: var(--muted); max-width: 900px; }
+    .hero p { color: var(--muted); max-width: 980px; }
 
     .grid {
       display: grid;
@@ -127,6 +127,11 @@
       border-radius: 12px;
       padding: 12px 14px;
       outline: none;
+    }
+
+    input[disabled] {
+      opacity: 0.8;
+      cursor: not-allowed;
     }
 
     input::file-selector-button {
@@ -222,8 +227,6 @@
     }
 
     td.mono { font-variant-numeric: tabular-nums; }
-    .muted { color: var(--muted); }
-    .danger { color: var(--danger); }
     .hidden { display: none !important; }
     .right { text-align: right; }
     .footer-note { color: var(--muted); font-size: 13px; margin-top: 12px; }
@@ -234,14 +237,17 @@
     <section class="hero">
       <h1>Painel DI - Curva, Emissão e Projeções</h1>
       <p>
-        Este painel roda inteiramente no navegador. Você envia a planilha de posição em Excel e o CSV da série CDI,
-        o sistema filtra os ativos indexados a DI, estima o percentual do CDI e projeta a curva para 6, 12, 18, 24,
-        36, 48 e 60 meses usando a última taxa diária do CDI como constante.
+        Este painel roda inteiramente no navegador. Você envia apenas a planilha <code>.xlsx</code>, e o sistema
+        busca automaticamente o arquivo <code>serie_cdi.csv</code> salvo no próprio repositório. A aplicação filtra
+        os ativos indexados a DI, estima o percentual do CDI e projeta a curva para 6, 12, 18, 24, 36, 48 e 60 meses
+        usando a última taxa diária disponível nesse CSV como constante. Se o CSV não tiver o dado mais recente do mercado,
+        o painel usa automaticamente a última data disponível dentro dele.
       </p>
       <div>
         <span class="pill">Uso em GitHub Pages</span>
         <span class="pill">Sem backend</span>
-        <span class="pill">Upload local de XLSX e CSV</span>
+        <span class="pill">Upload local só do XLSX</span>
+        <span class="pill">CDI lido de serie_cdi.csv</span>
       </div>
     </section>
 
@@ -253,16 +259,16 @@
           <input id="arquivoPosicao" type="file" accept=".xlsx" />
         </div>
         <div class="field">
-          <label for="arquivoCdi">CSV da série CDI (.csv)</label>
-          <input id="arquivoCdi" type="file" accept=".csv" />
-        </div>
-        <div class="field">
           <label for="nomeAba">Nome da aba da planilha</label>
           <input id="nomeAba" type="text" value="Renda Fixa" placeholder="Ex.: Renda Fixa" />
         </div>
         <div class="field">
           <label for="dataRef">Data de referência do CDI</label>
           <input id="dataRef" type="date" />
+        </div>
+        <div class="field">
+          <label>CSV do CDI no repositório</label>
+          <input id="cdiPath" type="text" value="./serie_cdi.csv" disabled />
         </div>
       </div>
       <div class="actions">
@@ -322,12 +328,16 @@
         </table>
       </div>
       <div class="footer-note">
-        Clique no cabeçalho de uma coluna para ordenar. Datas futuras acima do vencimento podem ficar vazias.
+        Clique no cabeçalho de uma coluna para ordenar. Datas futuras acima do vencimento podem ficar vazias. O arquivo
+        <code>serie_cdi.csv</code> deve estar publicado no mesmo diretório do <code>index.html</code>, e o painel usará
+        automaticamente a última data disponível dentro dele.
       </div>
     </section>
   </div>
 
   <script>
+    const NAO_PROJETAR_APOS_VENCIMENTO = true;
+
     const state = {
       dfResultado: [],
       dfDi: [],
@@ -335,6 +345,7 @@
       filtered: [],
       sortColumn: 'Nome do ativo',
       sortDirection: 'asc',
+      cdiCsvPath: './serie_cdi.csv',
     };
 
     const TABLE_COLUMNS = [
@@ -369,9 +380,9 @@
 
     const el = {
       arquivoPosicao: document.getElementById('arquivoPosicao'),
-      arquivoCdi: document.getElementById('arquivoCdi'),
       nomeAba: document.getElementById('nomeAba'),
       dataRef: document.getElementById('dataRef'),
+      cdiPath: document.getElementById('cdiPath'),
       btnProcessar: document.getElementById('btnProcessar'),
       btnExportar: document.getElementById('btnExportar'),
       btnLimpar: document.getElementById('btnLimpar'),
@@ -393,7 +404,10 @@
 
     function brNumber(v, digits = 2) {
       if (v === null || v === undefined || Number.isNaN(v)) return '-';
-      return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+      return Number(v).toLocaleString('pt-BR', {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      });
     }
 
     function brDate(v) {
@@ -442,9 +456,14 @@
     }
 
     function estimarFatorEmissao(valorUnitario, puObservado, taxasDiarias) {
-      if (!Number.isFinite(valorUnitario) || !Number.isFinite(puObservado)) return { fator: NaN, pu: NaN, erro: NaN };
+      if (!Number.isFinite(valorUnitario) || !Number.isFinite(puObservado)) {
+        return { fator: NaN, pu: NaN, erro: NaN };
+      }
+
       if (!taxasDiarias.length) {
-        if (Math.abs(puObservado - valorUnitario) < 1e-12) return { fator: 0, pu: valorUnitario, erro: 0 };
+        if (Math.abs(puObservado - valorUnitario) < 1e-12) {
+          return { fator: 0, pu: valorUnitario, erro: 0 };
+        }
         return { fator: NaN, pu: NaN, erro: NaN };
       }
 
@@ -458,7 +477,10 @@
         b *= 2;
         fb = f(b);
       }
-      if (!Number.isFinite(fa) || !Number.isFinite(fb) || fa * fb > 0) return { fator: NaN, pu: NaN, erro: NaN };
+
+      if (!Number.isFinite(fa) || !Number.isFinite(fb) || fa * fb > 0) {
+        return { fator: NaN, pu: NaN, erro: NaN };
+      }
 
       for (let i = 0; i < 300; i++) {
         const m = (a + b) / 2;
@@ -511,14 +533,16 @@
     }
 
     function parseCSV(text) {
-      const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+      const lines = text.replace(/^﻿/, '').split(/
+?
+/).filter(Boolean);
       if (!lines.length) return [];
       const delimiter = lines[0].includes(';') ? ';' : ',';
       const headers = splitCsvLine(lines[0], delimiter).map(h => h.trim());
       return lines.slice(1).map(line => {
         const parts = splitCsvLine(line, delimiter);
         const obj = {};
-        headers.forEach((h, i) => obj[h] = (parts[i] ?? '').trim());
+        headers.forEach((h, i) => { obj[h] = (parts[i] ?? '').trim(); });
         return obj;
       });
     }
@@ -570,8 +594,12 @@
       return { rows, actualSheet };
     }
 
-    async function readCsv(file) {
-      const text = await file.text();
+    async function fetchCsvFromRepo(path) {
+      const response = await fetch(path, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Não foi possível carregar o CSV do CDI em ${path}.`);
+      }
+      const text = await response.text();
       return parseCSV(text);
     }
 
@@ -622,7 +650,9 @@
           'Preço Atualizado FECHAMENTO',
           'Valor Atualizado FECHAMENTO',
         ]) {
-          if (Object.prototype.hasOwnProperty.call(row, col)) row[col] = parseNumeroBrasileiro(row[col]);
+          if (Object.prototype.hasOwnProperty.call(row, col)) {
+            row[col] = parseNumeroBrasileiro(row[col]);
+          }
         }
         return row;
       });
@@ -632,7 +662,9 @@
       if (!dataRefManual) return dfCdi[dfCdi.length - 1].data;
       const target = new Date(dataRefManual);
       const elegiveis = dfCdi.filter(r => new Date(r.data) <= target);
-      if (!elegiveis.length) throw new Error('Não há CDI disponível até a data de referência informada.');
+      if (!elegiveis.length) {
+        throw new Error('Não há CDI disponível até a data de referência informada.');
+      }
       return elegiveis[elegiveis.length - 1].data;
     }
 
@@ -647,7 +679,9 @@
         .sort((a, b) => a - b)[0];
 
       const cdiFiltrado = dfCdi.filter(r => new Date(r.data) >= dataMinima);
-      if (!cdiFiltrado.length) throw new Error('A série CDI não possui dados suficientes a partir da menor emissão.');
+      if (!cdiFiltrado.length) {
+        throw new Error('A série CDI não possui dados suficientes a partir da menor emissão.');
+      }
 
       const dataRefEfetiva = escolherDataRef(cdiFiltrado, dataRefManual);
       const linhaRef = cdiFiltrado.find(r => r.data === dataRefEfetiva);
@@ -715,7 +749,9 @@
             const puProj = projetarPuFuturo(precoCurva, estimativa.fator, taxaDiariaRef, dias);
             item[`Dias úteis proj ${meses}m`] = dias;
             item[`PU proj ${meses}m`] = puProj;
-            item[`Valor proj ${meses}m`] = Number.isFinite(puProj) && Number.isFinite(qtdDisp) ? puProj * qtdDisp : NaN;
+            item[`Valor proj ${meses}m`] = Number.isFinite(puProj) && Number.isFinite(qtdDisp)
+              ? puProj * qtdDisp
+              : NaN;
           }
         }
 
@@ -765,7 +801,10 @@
       let best = '-';
       let max = -1;
       for (const [k, v] of map.entries()) {
-        if (v > max) { best = `${k} (${v})`; max = v; }
+        if (v > max) {
+          best = `${k} (${v})`;
+          max = v;
+        }
       }
       return best;
     }
@@ -781,13 +820,21 @@
     }
 
     function popularFiltroEmissor(rows) {
-      const emissores = [...new Set(rows.map(r => r['Emissor filtro']).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
-      el.filtroEmissor.innerHTML = '<option value="">Todos</option>' + emissores.map(e => `<option value="${escapeHtml(String(e))}">${escapeHtml(String(e))}</option>`).join('');
+      const emissores = [...new Set(rows.map(r => r['Emissor filtro']).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+
+      el.filtroEmissor.innerHTML = '<option value="">Todos</option>' +
+        emissores.map(e => `<option value="${escapeHtml(String(e))}">${escapeHtml(String(e))}</option>`).join('');
+
       el.painelFiltros.classList.remove('hidden');
     }
 
     function escapeHtml(s) {
-      return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+      return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
     }
 
     function applyFilters() {
@@ -800,7 +847,12 @@
 
       if (busca) {
         rows = rows.filter(r => [
-          r['Nome do ativo'], r['Código'], r['Produto'], r['Emissor filtro'], r['Instituição'], r['Emissor']
+          r['Nome do ativo'],
+          r['Código'],
+          r['Produto'],
+          r['Emissor filtro'],
+          r['Instituição'],
+          r['Emissor']
         ].some(v => String(v ?? '').toLowerCase().includes(busca)));
       }
 
@@ -880,7 +932,6 @@
       state.dfCdi = [];
       state.filtered = [];
       el.arquivoPosicao.value = '';
-      el.arquivoCdi.value = '';
       el.filtroBusca.value = '';
       el.filtroEmissor.innerHTML = '<option value="">Todos</option>';
       el.painelResumo.classList.add('hidden');
@@ -894,14 +945,18 @@
 
     el.btnProcessar.addEventListener('click', async () => {
       try {
-        if (!el.arquivoPosicao.files[0]) throw new Error('Selecione a planilha de posição em Excel.');
-        if (!el.arquivoCdi.files[0]) throw new Error('Selecione o CSV da série CDI.');
+        if (!el.arquivoPosicao.files[0]) {
+          throw new Error('Selecione a planilha de posição em Excel.');
+        }
 
         el.btnProcessar.disabled = true;
-        setStatus('Lendo arquivos e processando os ativos DI...');
+        setStatus('Lendo a planilha, carregando serie_cdi.csv do repositório e processando os ativos DI...');
 
-        const { rows: posRows, actualSheet } = await readExcel(el.arquivoPosicao.files[0], el.nomeAba.value.trim() || 'Renda Fixa');
-        const cdiRows = await readCsv(el.arquivoCdi.files[0]);
+        const { rows: posRows, actualSheet } = await readExcel(
+          el.arquivoPosicao.files[0],
+          el.nomeAba.value.trim() || 'Renda Fixa'
+        );
+        const cdiRows = await fetchCsvFromRepo(state.cdiCsvPath);
 
         const dfPosicao = prepararDfPosicao(posRows);
         const dfCdi = prepararDfCdi(cdiRows);
@@ -922,8 +977,8 @@
         setStatus(
           `Processamento concluído. Aba usada: ${actualSheet}. ` +
           `Ativos DI: ${dfDi.length}. ` +
-          `Série CDI considerada: ${cdiFiltrado.length} registros. ` +
-          `Data de referência: ${brDate(dataRefEfetiva)}.`
+          `Série CDI carregada de ${state.cdiCsvPath}: ${cdiFiltrado.length} registros. ` +
+          `Última data disponível usada como referência: ${brDate(dataRefEfetiva)}.`
         );
       } catch (err) {
         console.error(err);
