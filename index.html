@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -533,9 +534,7 @@
     }
 
     function parseCSV(text) {
-      const lines = text.replace(/^﻿/, '').split(/
-?
-/).filter(Boolean);
+      const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
       if (!lines.length) return [];
       const delimiter = lines[0].includes(';') ? ';' : ',';
       const headers = splitCsvLine(lines[0], delimiter).map(h => h.trim());
