@@ -1,42 +1,1026 @@
-<script>
-function excelDateToISO(value) {
-  if (value === null || value === undefined || value === '') return null;
 
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return new Date(Date.UTC(
-      value.getFullYear(),
-      value.getMonth(),
-      value.getDate()
-    )).toISOString();
-  }
-
-  if (typeof value === 'number') {
-    const utcDays = Math.floor(value - 25569);
-    const utcValue = utcDays * 86400;
-    return new Date(utcValue * 1000).toISOString();
-  }
-
-  if (typeof value === 'string') {
-    const s = value.trim();
-
-    // dd/mm/yyyy
-    let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (m) {
-      const [, dd, mm, yyyy] = m;
-      return new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd))).toISOString();
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel DI - Curva e Projeções</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a31;
+      --panel-2: #17213d;
+      --text: #e8eefc;
+      --muted: #a8b3d1;
+      --accent: #61a0ff;
+      --border: #2a365c;
+      --shadow: 0 10px 30px rgba(0,0,0,.25);
+      --radius: 18px;
     }
 
-    // yyyy-mm-dd
-    m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) {
-      const [, yyyy, mm, dd] = m;
-      return new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd))).toISOString();
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #0e1530 100%);
+      color: var(--text);
     }
 
-    const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) return d.toISOString();
-  }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
 
-  return null;
-}
-</script>
+    h1, h2, h3, p { margin-top: 0; }
+
+    .hero {
+      background: linear-gradient(135deg, #152248 0%, #0e1734 100%);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .hero p { color: var(--muted); max-width: 980px; }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    @media (max-width: 1100px) {
+      .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 700px) {
+      .grid-4 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: rgba(18, 26, 49, 0.96);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .value {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .subvalue {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    @media (max-width: 1100px) {
+      .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 700px) {
+      .controls { grid-template-columns: 1fr; }
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input[type="text"], input[type="date"], select, input[type="file"] {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      outline: none;
+    }
+
+    input[disabled] {
+      opacity: 0.8;
+      cursor: not-allowed;
+    }
+
+    input::file-selector-button {
+      margin-right: 12px;
+      border: 0;
+      background: var(--accent);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    button {
+      border: 0;
+      background: var(--accent);
+      color: white;
+      padding: 12px 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button.secondary { background: #24345f; }
+    button.ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 14px;
+      min-height: 20px;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #13203f;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+      margin-right: 8px;
+      margin-top: 8px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1200px;
+      background: rgba(18, 26, 49, 0.96);
+    }
+
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #0f1733;
+      color: #cfe0ff;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .hidden { display: none !important; }
+    .right { text-align: right; }
+    .footer-note { color: var(--muted); font-size: 13px; margin-top: 12px; }
+    code { color: #cfe0ff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>Painel DI - Curva, Emissão e Projeções</h1>
+      <p>
+        Este painel roda inteiramente no navegador. Você envia apenas a planilha <code>.xlsx</code>, e o sistema
+        busca automaticamente o arquivo <code>serie_cdi.csv</code> salvo no próprio repositório. A aplicação filtra
+        os ativos indexados a DI, estima o percentual do CDI e projeta a curva para 6, 12, 18, 24, 36, 48 e 60 meses
+        usando a última taxa diária disponível nesse CSV como constante. Se o CSV não tiver o dado mais recente do mercado,
+        o painel usa automaticamente a última data disponível dentro dele.
+      </p>
+      <div>
+        <span class="pill">Uso em GitHub Pages</span>
+        <span class="pill">Sem backend</span>
+        <span class="pill">Upload local só do XLSX</span>
+        <span class="pill">CDI lido de serie_cdi.csv</span>
+      </div>
+    </section>
+
+    <section class="card" style="margin-bottom: 16px;">
+      <h2>Arquivos e processamento</h2>
+      <div class="controls">
+        <div class="field">
+          <label for="arquivoPosicao">Planilha de posição (.xlsx)</label>
+          <input id="arquivoPosicao" type="file" accept=".xlsx" />
+        </div>
+        <div class="field">
+          <label for="nomeAba">Nome da aba da planilha</label>
+          <input id="nomeAba" type="text" value="Renda Fixa" placeholder="Ex.: Renda Fixa" />
+        </div>
+        <div class="field">
+          <label for="dataRef">Data de referência do CDI</label>
+          <input id="dataRef" type="date" />
+        </div>
+        <div class="field">
+          <label>CSV do CDI no repositório</label>
+          <input id="cdiPath" type="text" value="./serie_cdi.csv" disabled />
+        </div>
+      </div>
+      <div class="footer-note" style="margin-top:12px;">
+        A data de referência é opcional. Se ficar em branco, o painel usa a última data disponível no <code>serie_cdi.csv</code>.
+        Se você preencher, ele usa a última data do CSV menor ou igual à data informada.
+      </div>
+      <div class="actions">
+        <button id="btnProcessar">Processar</button>
+        <button id="btnExportar" class="secondary" disabled>Exportar resultado em Excel</button>
+        <button id="btnLimpar" class="ghost">Limpar</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section id="painelResumo" class="grid grid-4 hidden" style="margin-bottom: 16px;"></section>
+
+    <section id="painelFiltros" class="card hidden" style="margin-bottom: 16px;">
+      <h2>Filtros</h2>
+      <div class="controls">
+        <div class="field">
+          <label for="filtroBusca">Buscar por ativo, código, produto ou emissor</label>
+          <input id="filtroBusca" type="text" placeholder="Digite parte do nome, código ou emissor" />
+        </div>
+        <div class="field">
+          <label for="filtroEmissor">Emissor</label>
+          <select id="filtroEmissor">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filtroOrdenar">Ordenar por</label>
+          <select id="filtroOrdenar">
+            <option value="Nome do ativo">Nome do ativo</option>
+            <option value="Valor Atualizado CURVA">Valor na curva</option>
+            <option value="Valor proj 6m">Valor em 6 meses</option>
+            <option value="Valor proj 12m">Valor em 12 meses</option>
+            <option value="Valor proj 18m">Valor em 18 meses</option>
+            <option value="Valor proj 24m">Valor em 24 meses</option>
+            <option value="Valor proj 36m">Valor em 36 meses</option>
+            <option value="Valor proj 48m">Valor em 48 meses</option>
+            <option value="Valor proj 60m">Valor em 60 meses</option>
+            <option value="% CDI estimado">% CDI estimado</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filtroDirecao">Direção</label>
+          <select id="filtroDirecao">
+            <option value="asc">Crescente</option>
+            <option value="desc">Decrescente</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section id="painelTabela" class="card hidden">
+      <h2>Resultados</h2>
+      <div class="table-wrap">
+        <table id="tabelaResultados">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="footer-note">
+        Clique no cabeçalho de uma coluna para ordenar. Datas futuras acima do vencimento podem ficar vazias. O arquivo
+        <code>serie_cdi.csv</code> deve estar publicado no mesmo diretório do <code>index.html</code>, e o painel usará
+        automaticamente a última data disponível dentro dele.
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const NAO_PROJETAR_APOS_VENCIMENTO = true;
+
+    const state = {
+      dfResultado: [],
+      dfDi: [],
+      dfCdi: [],
+      filtered: [],
+      sortColumn: 'Nome do ativo',
+      sortDirection: 'asc',
+      cdiCsvPath: './serie_cdi.csv',
+    };
+
+    const TABLE_COLUMNS = [
+      'Nome do ativo',
+      'Emissor filtro',
+      'Código',
+      'Preço Atualizado CURVA',
+      'Valor Atualizado CURVA',
+      '% CDI estimado',
+      'Valor proj 6m',
+      'Valor proj 12m',
+      'Valor proj 18m',
+      'Valor proj 24m',
+      'Valor proj 36m',
+      'Valor proj 48m',
+      'Valor proj 60m',
+      'Vencimento'
+    ];
+
+    const numericColumns = new Set([
+      'Preço Atualizado CURVA',
+      'Valor Atualizado CURVA',
+      '% CDI estimado',
+      'Valor proj 6m',
+      'Valor proj 12m',
+      'Valor proj 18m',
+      'Valor proj 24m',
+      'Valor proj 36m',
+      'Valor proj 48m',
+      'Valor proj 60m'
+    ]);
+
+    const el = {
+      arquivoPosicao: document.getElementById('arquivoPosicao'),
+      nomeAba: document.getElementById('nomeAba'),
+      dataRef: document.getElementById('dataRef'),
+      cdiPath: document.getElementById('cdiPath'),
+      btnProcessar: document.getElementById('btnProcessar'),
+      btnExportar: document.getElementById('btnExportar'),
+      btnLimpar: document.getElementById('btnLimpar'),
+      status: document.getElementById('status'),
+      painelResumo: document.getElementById('painelResumo'),
+      painelFiltros: document.getElementById('painelFiltros'),
+      painelTabela: document.getElementById('painelTabela'),
+      filtroBusca: document.getElementById('filtroBusca'),
+      filtroEmissor: document.getElementById('filtroEmissor'),
+      filtroOrdenar: document.getElementById('filtroOrdenar'),
+      filtroDirecao: document.getElementById('filtroDirecao'),
+      tabelaHead: document.querySelector('#tabelaResultados thead'),
+      tabelaBody: document.querySelector('#tabelaResultados tbody'),
+    };
+
+    function setStatus(text) {
+      el.status.textContent = text || '';
+    }
+
+    function brNumber(v, digits = 2) {
+      if (v === null || v === undefined || Number.isNaN(v)) return '-';
+      return Number(v).toLocaleString('pt-BR', {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      });
+    }
+
+    function brDate(v) {
+      if (!v) return '-';
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return '-';
+      return d.toLocaleDateString('pt-BR');
+    }
+
+    function parseNumeroBrasileiro(valor) {
+      if (valor === null || valor === undefined || valor === '') return NaN;
+      if (typeof valor === 'number') return valor;
+      let s = String(valor).trim();
+      if (['', '-', 'nan', 'None', 'NaT'].includes(s)) return NaN;
+      if (s.includes('.') && s.includes(',')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else if (s.includes(',')) {
+        s = s.replace(',', '.');
+      }
+      const num = Number(s);
+      return Number.isFinite(num) ? num : NaN;
+    }
+
+    function anualParaDiaria(taxaAnualPercentual) {
+      const taxaAnualDecimal = taxaAnualPercentual / 100;
+      return Math.pow(1 + taxaAnualDecimal, 1 / 252) - 1;
+    }
+
+    function chooseFirstExisting(columns, preferences) {
+      return preferences.find(c => columns.includes(c)) || null;
+    }
+
+    function inferirValorUnitario(valorAtualizadoCurva, qtdDisponivel) {
+      if (!Number.isFinite(valorAtualizadoCurva) || !Number.isFinite(qtdDisponivel) || qtdDisponivel <= 0) return NaN;
+      const ratio = valorAtualizadoCurva / qtdDisponivel;
+      const candidates = [1, 100, 1000];
+      return candidates.reduce((best, curr) => Math.abs(curr - ratio) < Math.abs(best - ratio) ? curr : best, candidates[0]);
+    }
+
+    function puModelado(valorUnitario, taxasDiarias, fator) {
+      if (!Number.isFinite(valorUnitario)) return NaN;
+      if (!taxasDiarias.length) return valorUnitario;
+      let acumulado = 1;
+      for (const taxa of taxasDiarias) acumulado *= (1 + fator * taxa);
+      return valorUnitario * acumulado;
+    }
+
+    function estimarFatorEmissao(valorUnitario, puObservado, taxasDiarias) {
+      if (!Number.isFinite(valorUnitario) || !Number.isFinite(puObservado)) {
+        return { fator: NaN, pu: NaN, erro: NaN };
+      }
+
+      if (!taxasDiarias.length) {
+        if (Math.abs(puObservado - valorUnitario) < 1e-12) {
+          return { fator: 0, pu: valorUnitario, erro: 0 };
+        }
+        return { fator: NaN, pu: NaN, erro: NaN };
+      }
+
+      const f = (x) => puModelado(valorUnitario, taxasDiarias, x) - puObservado;
+      let a = 0;
+      let b = 3;
+      let fa = f(a);
+      let fb = f(b);
+
+      while ((!Number.isFinite(fa) || !Number.isFinite(fb) || fa * fb > 0) && b < 20) {
+        b *= 2;
+        fb = f(b);
+      }
+
+      if (!Number.isFinite(fa) || !Number.isFinite(fb) || fa * fb > 0) {
+        return { fator: NaN, pu: NaN, erro: NaN };
+      }
+
+      for (let i = 0; i < 300; i++) {
+        const m = (a + b) / 2;
+        const fm = f(m);
+        if (Math.abs(fm) < 1e-12 || Math.abs(b - a) < 1e-12) {
+          const pu = puModelado(valorUnitario, taxasDiarias, m);
+          return { fator: m, pu, erro: pu - puObservado };
+        }
+        if (fa * fm <= 0) {
+          b = m;
+          fb = fm;
+        } else {
+          a = m;
+          fa = fm;
+        }
+      }
+
+      const m = (a + b) / 2;
+      const pu = puModelado(valorUnitario, taxasDiarias, m);
+      return { fator: m, pu, erro: pu - puObservado };
+    }
+
+    function busdayCount(startDate, endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (end <= start) return 0;
+      let count = 0;
+      const current = new Date(start);
+      while (current < end) {
+        const day = current.getDay();
+        if (day !== 0 && day !== 6) count += 1;
+        current.setDate(current.getDate() + 1);
+      }
+      return count;
+    }
+
+    function addMonths(dateValue, months) {
+      const d = new Date(dateValue);
+      const day = d.getUTCDate();
+      d.setUTCMonth(d.getUTCMonth() + months);
+      if (d.getUTCDate() < day) d.setUTCDate(0);
+      return d;
+    }
+
+    function projetarPuFuturo(puBase, fatorEmissao, taxaDiariaConstante, nDiasUteis) {
+      if (![puBase, fatorEmissao, taxaDiariaConstante].every(Number.isFinite)) return NaN;
+      if (nDiasUteis <= 0) return puBase;
+      const fatorDiarioAtivo = 1 + fatorEmissao * taxaDiariaConstante;
+      return puBase * Math.pow(fatorDiarioAtivo, nDiasUteis);
+    }
+
+    function parseCSV(text) {
+      const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+      if (!lines.length) return [];
+      const delimiter = lines[0].includes(';') ? ';' : ',';
+      const headers = splitCsvLine(lines[0], delimiter).map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const parts = splitCsvLine(line, delimiter);
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (parts[i] ?? '').trim(); });
+        return obj;
+      });
+    }
+
+    function splitCsvLine(line, delimiter) {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === delimiter && !inQuotes) {
+          result.push(current);
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      result.push(current);
+      return result;
+    }
+
+    function excelDateToISO(value) {
+      if (value === null || value === undefined || value === '') return null;
+
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return new Date(Date.UTC(
+          value.getFullYear(),
+          value.getMonth(),
+          value.getDate()
+        )).toISOString();
+      }
+
+      if (typeof value === 'number') {
+        const utcDays = Math.floor(value - 25569);
+        const utcValue = utcDays * 86400;
+        return new Date(utcValue * 1000).toISOString();
+      }
+
+      if (typeof value === 'string') {
+        const s = value.trim();
+
+        let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (m) {
+          const [, dd, mm, yyyy] = m;
+          return new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd))).toISOString();
+        }
+
+        m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) {
+          const [, yyyy, mm, dd] = m;
+          return new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd))).toISOString();
+        }
+
+        const d = new Date(s);
+        if (!Number.isNaN(d.getTime())) return d.toISOString();
+      }
+
+      return null;
+    }
+
+    async function readExcel(file, sheetName) {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+      const actualSheet = workbook.Sheets[sheetName] ? sheetName : workbook.SheetNames[0];
+      const sheet = workbook.Sheets[actualSheet];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
+      return { rows, actualSheet };
+    }
+
+    async function fetchCsvFromRepo(path) {
+      const response = await fetch(path, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Não foi possível carregar o CSV do CDI em ${path}.`);
+      }
+      const text = await response.text();
+      return parseCSV(text);
+    }
+
+    function prepararDfCdi(rows) {
+      const out = rows.map(r => ({ ...r }));
+      if (!out.length) throw new Error('O CSV do CDI está vazio.');
+      if (!Object.prototype.hasOwnProperty.call(out[0], 'data')) {
+        throw new Error("O CSV do CDI precisa ter a coluna 'data'.");
+      }
+
+      for (const row of out) {
+        row.data = excelDateToISO(row.data);
+        row.taxa_anual_percentual = parseNumeroBrasileiro(row.taxa_anual_percentual);
+        row.taxa_diaria_decimal = parseNumeroBrasileiro(row.taxa_diaria_decimal);
+        if (!Number.isFinite(row.taxa_diaria_decimal) && Number.isFinite(row.taxa_anual_percentual)) {
+          row.taxa_diaria_decimal = anualParaDiaria(row.taxa_anual_percentual);
+        }
+      }
+
+      return out
+        .filter(r => r.data && Number.isFinite(r.taxa_diaria_decimal))
+        .sort((a, b) => new Date(a.data) - new Date(b.data))
+        .filter((row, idx, arr) => idx === arr.findLastIndex(x => x.data === row.data));
+    }
+
+    function prepararDfPosicao(rows) {
+      if (!rows.length) throw new Error('A planilha de posição está vazia.');
+      const first = rows[0];
+      for (const col of ['Indexador', 'Data de Emissão', 'Vencimento']) {
+        if (!Object.prototype.hasOwnProperty.call(first, col)) {
+          throw new Error(`A planilha precisa ter a coluna '${col}'.`);
+        }
+      }
+
+      return rows.map(r => {
+        const row = { ...r };
+        row['Indexador'] = String(row['Indexador'] ?? '').trim().toUpperCase();
+        row['Data de Emissão'] = excelDateToISO(row['Data de Emissão']);
+        row['Vencimento'] = excelDateToISO(row['Vencimento']);
+        for (const col of [
+          'Quantidade',
+          'Quantidade Disponível',
+          'Quantidade Indisponível',
+          'Preço Atualizado MTM',
+          'Valor Atualizado MTM',
+          'Preço Atualizado CURVA',
+          'Valor Atualizado CURVA',
+          'Preço Atualizado FECHAMENTO',
+          'Valor Atualizado FECHAMENTO',
+        ]) {
+          if (Object.prototype.hasOwnProperty.call(row, col)) {
+            row[col] = parseNumeroBrasileiro(row[col]);
+          }
+        }
+        return row;
+      });
+    }
+
+    function escolherDataRef(dfCdi, dataRefManual) {
+      if (!dataRefManual) return dfCdi[dfCdi.length - 1].data;
+      const target = new Date(dataRefManual);
+      const elegiveis = dfCdi.filter(r => new Date(r.data) <= target);
+      if (!elegiveis.length) {
+        throw new Error('Não há CDI disponível até a data de referência informada.');
+      }
+      return elegiveis[elegiveis.length - 1].data;
+    }
+
+    function processar(dfPosicao, dfCdi, dataRefManual) {
+      const dfDi = dfPosicao.filter(r => r['Indexador'] === 'DI');
+      console.log('Total DI na planilha:', dfDi.length);
+      console.log('Datas de emissão válidas:', dfDi.filter(r => r['Data de Emissão']).length);
+
+      if (!dfDi.length) throw new Error('Não há ativos com Indexador = DI na planilha enviada.');
+
+      const dataMinima = dfDi
+        .map(r => r['Data de Emissão'])
+        .filter(Boolean)
+        .map(d => new Date(d))
+        .sort((a, b) => a - b)[0];
+
+      if (!dataMinima || Number.isNaN(dataMinima.getTime())) {
+        throw new Error('Não foi possível identificar uma Data de Emissão válida para os ativos DI.');
+      }
+
+      const cdiFiltrado = dfCdi.filter(r => new Date(r.data) >= dataMinima);
+      if (!cdiFiltrado.length) {
+        throw new Error('A série CDI não possui dados suficientes a partir da menor emissão.');
+      }
+
+      const dataRefEfetiva = escolherDataRef(cdiFiltrado, dataRefManual);
+      const linhaRef = cdiFiltrado.find(r => r.data === dataRefEfetiva);
+      const taxaDiariaRef = linhaRef.taxa_diaria_decimal;
+      const taxaAnualRef = linhaRef.taxa_anual_percentual;
+
+      const columns = Object.keys(dfDi[0]);
+      const colNomeAtivo = chooseFirstExisting(columns, ['Ativo', 'Nome do Ativo', 'Produto', 'Código']);
+      const colEmissor = chooseFirstExisting(columns, ['Emissor', 'Instituição']);
+
+      const resultado = [];
+
+      for (const row of dfDi) {
+        const qtdDisp = row['Quantidade Disponível'];
+        const valorCurva = row['Valor Atualizado CURVA'];
+        const precoCurva = row['Preço Atualizado CURVA'];
+        const dataEmissao = row['Data de Emissão'];
+        const vencimento = row['Vencimento'];
+
+        if (!dataEmissao || !Number.isFinite(qtdDisp) || qtdDisp <= 0) continue;
+
+        const valorUnitario = inferirValorUnitario(valorCurva, qtdDisp);
+        const taxasDiarias = cdiFiltrado
+          .filter(r => new Date(r.data) > new Date(dataEmissao) && new Date(r.data) <= new Date(dataRefEfetiva))
+          .map(r => r.taxa_diaria_decimal);
+
+        const estimativa = estimarFatorEmissao(valorUnitario, precoCurva, taxasDiarias);
+
+        const item = {
+          'Nome do ativo': row[colNomeAtivo] ?? row['Código'] ?? row['Produto'] ?? '-',
+          'Emissor filtro': row[colEmissor] ?? '-',
+          'Código': row['Código'] ?? '-',
+          'Produto': row['Produto'] ?? '-',
+          'Instituição': row['Instituição'] ?? '-',
+          'Emissor': row['Emissor'] ?? '-',
+          'Indexador': row['Indexador'],
+          'Data de Emissão': dataEmissao,
+          'Vencimento': vencimento,
+          'Quantidade': row['Quantidade'],
+          'Quantidade Disponível': qtdDisp,
+          'Preço Atualizado CURVA': precoCurva,
+          'Valor Atualizado CURVA': valorCurva,
+          'Valor unitário inferido': valorUnitario,
+          'Data ref CDI': dataRefEfetiva,
+          'CDI anual da data ref (%)': taxaAnualRef,
+          'CDI diário da data ref': taxaDiariaRef,
+          'N dias CDI históricos': taxasDiarias.length,
+          'Fator emissão (decimal)': estimativa.fator,
+          '% CDI estimado': Number.isFinite(estimativa.fator) ? estimativa.fator * 100 : NaN,
+          'PU modelado histórico': estimativa.pu,
+          'Erro PU histórico': estimativa.erro,
+          'Erro absoluto histórico': Number.isFinite(estimativa.erro) ? Math.abs(estimativa.erro) : NaN,
+        };
+
+        for (const meses of [6, 12, 18, 24, 36, 48, 60]) {
+          const dataFutura = addMonths(dataRefEfetiva, meses);
+          item[`Data proj ${meses}m`] = dataFutura.toISOString();
+
+          if (NAO_PROJETAR_APOS_VENCIMENTO && vencimento && dataFutura > new Date(vencimento)) {
+            item[`Dias úteis proj ${meses}m`] = NaN;
+            item[`PU proj ${meses}m`] = NaN;
+            item[`Valor proj ${meses}m`] = NaN;
+          } else {
+            const dias = busdayCount(dataRefEfetiva, dataFutura);
+            const puProj = projetarPuFuturo(precoCurva, estimativa.fator, taxaDiariaRef, dias);
+            item[`Dias úteis proj ${meses}m`] = dias;
+            item[`PU proj ${meses}m`] = puProj;
+            item[`Valor proj ${meses}m`] = Number.isFinite(puProj) && Number.isFinite(qtdDisp)
+              ? puProj * qtdDisp
+              : NaN;
+          }
+        }
+
+        resultado.push(item);
+      }
+
+      resultado.sort((a, b) => {
+        const ea = a['Erro absoluto histórico'];
+        const eb = b['Erro absoluto histórico'];
+        if (!Number.isFinite(ea) && !Number.isFinite(eb)) return 0;
+        if (!Number.isFinite(ea)) return 1;
+        if (!Number.isFinite(eb)) return -1;
+        return ea - eb;
+      });
+
+      return { resultado, dfDi, cdiFiltrado, dataRefEfetiva };
+    }
+
+    function renderResumo(rows, dataRefEfetiva) {
+      const soma = (campo) => rows.reduce((acc, r) => acc + (Number.isFinite(r[campo]) ? r[campo] : 0), 0);
+      const html = [
+        cardResumo('Ativos DI', String(rows.length), `Data de referência: ${brDate(dataRefEfetiva)}`),
+        cardResumo('Valor na curva', `R$ ${brNumber(soma('Valor Atualizado CURVA'))}`, 'Soma dos valores atuais na curva'),
+        cardResumo('Valor projetado 6m', `R$ ${brNumber(soma('Valor proj 6m'))}`, 'Soma do horizonte de 6 meses'),
+        cardResumo('Valor projetado 12m', `R$ ${brNumber(soma('Valor proj 12m'))}`, 'Soma do horizonte de 12 meses'),
+        cardResumo('Valor projetado 24m', `R$ ${brNumber(soma('Valor proj 24m'))}`, 'Soma do horizonte de 24 meses'),
+        cardResumo('Valor projetado 60m', `R$ ${brNumber(soma('Valor proj 60m'))}`, 'Soma do horizonte de 60 meses'),
+        cardResumo('% CDI médio', `${brNumber(mediaCampo(rows, '% CDI estimado'))}%`, 'Média simples das estimativas'),
+        cardResumo('Maior emissor filtrado', topEmissor(rows), 'Maior contagem no recorte atual'),
+      ].join('');
+      el.painelResumo.innerHTML = html;
+      el.painelResumo.classList.remove('hidden');
+    }
+
+    function mediaCampo(rows, campo) {
+      const vals = rows.map(r => r[campo]).filter(Number.isFinite);
+      if (!vals.length) return NaN;
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+
+    function topEmissor(rows) {
+      const map = new Map();
+      for (const row of rows) {
+        const key = row['Emissor filtro'] || '-';
+        map.set(key, (map.get(key) || 0) + 1);
+      }
+      let best = '-';
+      let max = -1;
+      for (const [k, v] of map.entries()) {
+        if (v > max) {
+          best = `${k} (${v})`;
+          max = v;
+        }
+      }
+      return best;
+    }
+
+    function cardResumo(label, value, subvalue) {
+      return `
+        <div class="card">
+          <span class="label">${label}</span>
+          <div class="value">${value}</div>
+          <div class="subvalue">${subvalue}</div>
+        </div>
+      `;
+    }
+
+    function popularFiltroEmissor(rows) {
+      const emissores = [...new Set(rows.map(r => r['Emissor filtro']).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+
+      el.filtroEmissor.innerHTML = '<option value="">Todos</option>' +
+        emissores.map(e => `<option value="${escapeHtml(String(e))}">${escapeHtml(String(e))}</option>`).join('');
+
+      el.painelFiltros.classList.remove('hidden');
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+
+    function applyFilters() {
+      const busca = (el.filtroBusca.value || '').toLowerCase().trim();
+      const emissor = el.filtroEmissor.value || '';
+      state.sortColumn = el.filtroOrdenar.value;
+      state.sortDirection = el.filtroDirecao.value;
+
+      let rows = [...state.dfResultado];
+
+      if (busca) {
+        rows = rows.filter(r => [
+          r['Nome do ativo'],
+          r['Código'],
+          r['Produto'],
+          r['Emissor filtro'],
+          r['Instituição'],
+          r['Emissor']
+        ].some(v => String(v ?? '').toLowerCase().includes(busca)));
+      }
+
+      if (emissor) {
+        rows = rows.filter(r => String(r['Emissor filtro'] ?? '') === emissor);
+      }
+
+      const col = state.sortColumn;
+      const dir = state.sortDirection === 'desc' ? -1 : 1;
+      rows.sort((a, b) => compareValues(a[col], b[col]) * dir);
+
+      state.filtered = rows;
+      renderResumo(rows, rows[0]?.['Data ref CDI'] || state.dfResultado[0]?.['Data ref CDI']);
+      renderTable(rows);
+    }
+
+    function compareValues(a, b) {
+      const aNum = Number(a);
+      const bNum = Number(b);
+      const aDate = new Date(a);
+      const bDate = new Date(b);
+
+      if (Number.isFinite(aNum) && Number.isFinite(bNum)) return aNum - bNum;
+      if (!Number.isNaN(aDate.getTime()) && !Number.isNaN(bDate.getTime())) return aDate - bDate;
+      return String(a ?? '').localeCompare(String(b ?? ''), 'pt-BR');
+    }
+
+    function renderTable(rows) {
+      el.painelTabela.classList.remove('hidden');
+      el.tabelaHead.innerHTML = `<tr>${TABLE_COLUMNS.map(c => `<th data-col="${escapeHtml(c)}">${escapeHtml(c)}</th>`).join('')}</tr>`;
+      el.tabelaBody.innerHTML = rows.map(r => `
+        <tr>
+          ${TABLE_COLUMNS.map(c => renderCell(c, r[c])).join('')}
+        </tr>
+      `).join('');
+
+      el.tabelaHead.querySelectorAll('th').forEach(th => {
+        th.addEventListener('click', () => {
+          const col = th.dataset.col;
+          if (state.sortColumn === col) {
+            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.sortColumn = col;
+            state.sortDirection = 'asc';
+          }
+          el.filtroOrdenar.value = state.sortColumn;
+          el.filtroDirecao.value = state.sortDirection;
+          applyFilters();
+        });
+      });
+    }
+
+    function renderCell(column, value) {
+      if (numericColumns.has(column)) {
+        return `<td class="right">${Number.isFinite(value) ? brNumber(value) : '-'}</td>`;
+      }
+      if (String(column).toLowerCase().includes('data') || column === 'Vencimento') {
+        return `<td>${brDate(value)}</td>`;
+      }
+      return `<td>${escapeHtml(value ?? '-')}</td>`;
+    }
+
+    function exportarExcel() {
+      const wb = XLSX.utils.book_new();
+      const ws1 = XLSX.utils.json_to_sheet(state.filtered.length ? state.filtered : state.dfResultado);
+      const ws2 = XLSX.utils.json_to_sheet(state.dfDi);
+      const ws3 = XLSX.utils.json_to_sheet(state.dfCdi);
+      XLSX.utils.book_append_sheet(wb, ws1, 'Estimativa');
+      XLSX.utils.book_append_sheet(wb, ws2, 'Ativos_DI');
+      XLSX.utils.book_append_sheet(wb, ws3, 'Serie_CDI');
+      XLSX.writeFile(wb, 'estimativa_taxa_emissao_di.xlsx');
+    }
+
+    function limparTudo() {
+      state.dfResultado = [];
+      state.dfDi = [];
+      state.dfCdi = [];
+      state.filtered = [];
+      el.arquivoPosicao.value = '';
+      el.filtroBusca.value = '';
+      el.filtroEmissor.innerHTML = '<option value="">Todos</option>';
+      el.painelResumo.classList.add('hidden');
+      el.painelFiltros.classList.add('hidden');
+      el.painelTabela.classList.add('hidden');
+      el.tabelaHead.innerHTML = '';
+      el.tabelaBody.innerHTML = '';
+      el.btnExportar.disabled = true;
+      setStatus('');
+    }
+
+    el.btnProcessar.addEventListener('click', async () => {
+      try {
+        if (!el.arquivoPosicao.files[0]) {
+          throw new Error('Selecione a planilha de posição em Excel.');
+        }
+
+        el.btnProcessar.disabled = true;
+        setStatus('Lendo a planilha, carregando serie_cdi.csv do repositório e processando os ativos DI...');
+
+        const { rows: posRows, actualSheet } = await readExcel(
+          el.arquivoPosicao.files[0],
+          el.nomeAba.value.trim() || 'Renda Fixa'
+        );
+        const cdiRows = await fetchCsvFromRepo(state.cdiCsvPath);
+
+        const dfPosicao = prepararDfPosicao(posRows);
+        const dfCdi = prepararDfCdi(cdiRows);
+        const dataRefManual = el.dataRef.value || null;
+
+        const { resultado, dfDi, cdiFiltrado, dataRefEfetiva } = processar(dfPosicao, dfCdi, dataRefManual);
+
+        state.dfResultado = resultado;
+        state.dfDi = dfDi;
+        state.dfCdi = cdiFiltrado;
+        state.sortColumn = 'Nome do ativo';
+        state.sortDirection = 'asc';
+
+        popularFiltroEmissor(resultado);
+        applyFilters();
+        el.btnExportar.disabled = false;
+
+        setStatus(
+          `Processamento concluído. Aba usada: ${actualSheet}. ` +
+          `Ativos DI encontrados na planilha: ${dfDi.length}. ` +
+          `Ativos DI exibidos após processamento: ${resultado.length}. ` +
+          `Série CDI carregada de ${state.cdiCsvPath}: ${cdiFiltrado.length} registros. ` +
+          `Última data disponível usada como referência: ${brDate(dataRefEfetiva)}.`
+        );
+      } catch (err) {
+        console.error(err);
+        setStatus(`Erro: ${err.message || err}`);
+      } finally {
+        el.btnProcessar.disabled = false;
+      }
+    });
+
+    el.btnExportar.addEventListener('click', exportarExcel);
+    el.btnLimpar.addEventListener('click', limparTudo);
+    el.filtroBusca.addEventListener('input', applyFilters);
+    el.filtroEmissor.addEventListener('change', applyFilters);
+    el.filtroOrdenar.addEventListener('change', applyFilters);
+    el.filtroDirecao.addEventListener('change', applyFilters);
+  </script>
+</body>
+</html>
