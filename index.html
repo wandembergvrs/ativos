@@ -4,699 +4,341 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel DI, Prefixado e IPCA - Curva e Projeções</title>
+  <title>Painel Leve - DI, Prefixado e IPCA</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg: #0b1020;
       --panel: #121a31;
-      --panel-2: #17213d;
+      --panel2: #182347;
       --text: #e8eefc;
       --muted: #a8b3d1;
-      --accent: #61a0ff;
+      --accent: #6ea8fe;
       --border: #2a365c;
-      --shadow: 0 10px 30px rgba(0,0,0,.25);
-      --radius: 18px;
+      --ok: #7ce7c3;
     }
-
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
-      background: linear-gradient(180deg, #0b1020 0%, #0e1530 100%);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      background: linear-gradient(180deg, #0b1020 0%, #10183a 100%);
       color: var(--text);
     }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-
-    h1, h2, h3, p { margin-top: 0; }
-
-    .hero {
-      background: linear-gradient(135deg, #152248 0%, #0e1734 100%);
-      border: 1px solid var(--border);
-      border-radius: 28px;
-      padding: 28px;
-      box-shadow: var(--shadow);
-      margin-bottom: 20px;
-    }
-
-    .hero p { color: var(--muted); max-width: 980px; }
-
-    .grid {
-      display: grid;
-      gap: 16px;
-    }
-
-    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-
-    @media (max-width: 1100px) {
-      .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-    @media (max-width: 700px) {
-      .grid-4 { grid-template-columns: 1fr; }
-    }
-
+    .container { max-width: 1380px; margin: 0 auto; padding: 24px; }
     .card {
-      background: rgba(18, 26, 49, 0.96);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px;
-      box-shadow: var(--shadow);
-    }
-
-    .label {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      margin-bottom: 8px;
-      display: block;
-    }
-
-    .value {
-      font-size: 28px;
-      font-weight: 700;
-    }
-
-    .subvalue {
-      margin-top: 6px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    @media (max-width: 1100px) {
-      .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-    @media (max-width: 700px) {
-      .controls { grid-template-columns: 1fr; }
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .field label {
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    input[type="text"], input[type="date"], select, input[type="file"] {
-      width: 100%;
-      background: var(--panel-2);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px 14px;
-      outline: none;
-    }
-
-    input[disabled] {
-      opacity: 0.8;
-      cursor: not-allowed;
-    }
-
-    input::file-selector-button {
-      margin-right: 12px;
-      border: 0;
-      background: var(--accent);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 14px;
-    }
-
-    button {
-      border: 0;
-      background: var(--accent);
-      color: white;
-      padding: 12px 18px;
-      border-radius: 12px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    button.secondary { background: #24345f; }
-    button.ghost {
-      background: transparent;
-      border: 1px solid var(--border);
-    }
-
-    button:disabled {
-      opacity: .6;
-      cursor: not-allowed;
-    }
-
-    .status {
-      margin-top: 12px;
-      color: var(--muted);
-      font-size: 14px;
-      min-height: 20px;
-      white-space: pre-wrap;
-    }
-
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: #13203f;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      font-size: 13px;
-      margin-right: 8px;
-      margin-top: 8px;
-    }
-
-    .table-wrap {
-      overflow: auto;
+      background: rgba(18,26,49,.96);
       border: 1px solid var(--border);
       border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+      margin-bottom: 16px;
     }
-
-    table {
+    h1,h2,h3,p { margin-top: 0; }
+    p { color: var(--muted); }
+    .hero { padding: 24px; border-radius: 24px; }
+    .grid { display: grid; gap: 14px; }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    @media (max-width: 1100px) { .grid-4, .grid-3 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 700px) { .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+    .field { display: flex; flex-direction: column; gap: 8px; }
+    .field label { font-size: 13px; color: var(--muted); }
+    input, select, button {
+      font: inherit;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+    }
+    input, select {
+      background: var(--panel2);
+      color: var(--text);
       width: 100%;
-      border-collapse: collapse;
-      min-width: 1200px;
-      background: rgba(18, 26, 49, 0.96);
     }
-
-    th, td {
-      padding: 12px 10px;
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-      font-size: 14px;
+    input[type="file"]::file-selector-button {
+      border: 0; background: var(--accent); color: #fff; padding: 8px 12px; border-radius: 10px; margin-right: 10px; cursor: pointer;
     }
-
-    th {
-      position: sticky;
-      top: 0;
-      background: #0f1733;
-      color: #cfe0ff;
-      cursor: pointer;
-      user-select: none;
-    }
-
+    input[type="checkbox"] { width: auto; transform: scale(1.15); }
+    .checkbox-row { display: flex; align-items: center; gap: 10px; padding-top: 28px; }
+    button { background: var(--accent); color: white; cursor: pointer; border: 0; font-weight: 600; }
+    button.secondary { background: #24345f; }
+    button.ghost { background: transparent; border: 1px solid var(--border); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+    .status { min-height: 20px; font-size: 14px; color: var(--muted); white-space: pre-wrap; margin-top: 10px; }
+    .pill { display: inline-block; padding: 7px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--muted); margin-right: 8px; margin-top: 8px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+    @media (max-width: 1100px) { .summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 700px) { .summary-grid { grid-template-columns: 1fr; } }
+    .metric-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .metric-value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+    .metric-sub { font-size: 13px; color: var(--muted); margin-top: 6px; }
     .hidden { display: none !important; }
-    .right { text-align: right; }
-    .footer-note { color: var(--muted); font-size: 13px; margin-top: 12px; }
-    code { color: #cfe0ff; }
+    .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 18px; }
+    table { width: 100%; min-width: 1350px; border-collapse: collapse; background: rgba(18,26,49,.96); }
+    th, td { padding: 11px 10px; border-bottom: 1px solid var(--border); font-size: 14px; text-align: left; }
+    th { position: sticky; top: 0; background: #0f1733; color: #cfe0ff; cursor: pointer; }
+    td.right { text-align: right; font-variant-numeric: tabular-nums; }
+    .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <section class="hero">
-  <h1>Painel DI, Prefixado e IPCA - Curva, Emissão e Projeções</h1>
-  <p>
-    Este painel roda inteiramente no navegador. Você envia a planilha <code>.xlsx</code>, e o sistema
-    busca automaticamente <code>serie_cdi.csv</code> e, quando existir, <code>serie_ipca.csv</code> no próprio repositório.
-    O processamento contempla ativos DI, PREFIXADO e IPCA. As projeções futuras podem respeitar ou ignorar o vencimento,
-    usam cenários de SELIC/CDI por blocos de 6 meses e, para IPCA, usam o CSV histórico quando disponível ou um cenário
-    manual informado pelo usuário.
-  </p>
-  <div>
-    <span class="pill">Uso em GitHub Pages</span>
-    <span class="pill">Sem backend</span>
-    <span class="pill">Upload local só do XLSX</span>
-    <span class="pill">CDI lido de serie_cdi.csv</span>
-    <span class="pill">IPCA opcional em serie_ipca.csv</span>
-  </div>
-</section>
+    <section class="card hero">
+      <h1>Painel leve - renda fixa</h1>
+      <p>
+        Você envia a planilha <code>.xlsx</code>. O painel lê automaticamente <code>serie_cdi.csv</code> e, se existir,
+        <code>serie_ipca.csv</code> e <code>compras_secundario.csv</code> no mesmo diretório do site. A data de referência é opcional:
+        em branco, o cálculo usa a última data disponível do CSV do CDI.
+      </p>
+      <div>
+        <span class="pill">GitHub Pages</span>
+        <span class="pill">Sem backend</span>
+        <span class="pill">Painel simplificado</span>
+        <span class="pill">Filtro por exclusão de emissor</span>
+      </div>
+    </section>
 
-    <section class="card" style="margin-bottom: 16px;">
-  <h2>Arquivos e processamento</h2>
-  <div class="controls">
-    <div class="field">
-      <label for="arquivoPosicao">Planilha de posição (.xlsx)</label>
-      <input id="arquivoPosicao" type="file" accept=".xlsx" />
-    </div>
-    <div class="field">
-      <label for="nomeAba">Nome da aba da planilha</label>
-      <input id="nomeAba" type="text" value="Renda Fixa" placeholder="Ex.: Renda Fixa" />
-    </div>
-    <div class="field">
-      <label for="dataRef">Data de referência</label>
-      <input id="dataRef" type="date" />
-    </div>
-    <div class="field">
-      <label>CSV do CDI no repositório</label>
-      <input id="cdiPath" type="text" value="./serie_cdi.csv" disabled />
-    </div>
-  </div>
+    <section class="card">
+      <h2>Processamento</h2>
+      <div class="grid grid-4">
+        <div class="field">
+          <label for="arquivoPosicao">Planilha de posição (.xlsx)</label>
+          <input id="arquivoPosicao" type="file" accept=".xlsx" />
+        </div>
+        <div class="field">
+          <label for="nomeAba">Nome da aba</label>
+          <input id="nomeAba" type="text" value="Renda Fixa" />
+        </div>
+        <div class="field">
+          <label for="dataRef">Data de referência</label>
+          <input id="dataRef" type="date" />
+        </div>
+        <div class="field">
+          <label for="tipoProjecao">Horizonte mostrado</label>
+          <select id="tipoProjecao">
+            <option value="12">12 meses</option>
+            <option value="6">6 meses</option>
+            <option value="24">24 meses</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-4" style="margin-top: 14px;">
+        <div class="field">
+          <label for="cdiFuturo">CDI/SELIC anual futura (%)</label>
+          <input id="cdiFuturo" type="number" step="0.01" value="14.15" />
+        </div>
+        <div class="field">
+          <label for="ipcaFuturo">IPCA anual futuro (%)</label>
+          <input id="ipcaFuturo" type="number" step="0.01" value="4.50" />
+        </div>
+        <div class="field">
+          <label for="caminhoCdi">CDI no repositório</label>
+          <input id="caminhoCdi" type="text" value="./serie_cdi.csv" disabled />
+        </div>
+        <div class="field">
+          <label for="caminhoIpca">IPCA no repositório</label>
+          <input id="caminhoIpca" type="text" value="./serie_ipca.csv (opcional)" disabled />
+        </div>
+      </div>
+      <div class="grid grid-2" style="margin-top: 14px;">
+        <div class="checkbox-row">
+          <input id="ignorarVencimento" type="checkbox" />
+          <label for="ignorarVencimento">Projetar sem levar em conta o vencimento</label>
+        </div>
+        <div class="checkbox-row">
+          <input id="usarCsvIpca" type="checkbox" checked />
+          <label for="usarCsvIpca">Tentar usar serie_ipca.csv se existir</label>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnProcessar">Processar</button>
+        <button id="btnExportar" class="secondary" disabled>Exportar Excel</button>
+        <button id="btnLimpar" class="ghost">Limpar</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
 
-  <div class="controls" style="margin-top:14px;">
-    <div class="field">
-      <label>CSV do IPCA no repositório</label>
-      <input id="ipcaPath" type="text" value="./serie_ipca.csv" disabled />
-    </div>
-    <div class="field">
-      <label for="toggleIgnorarVencimento">Projeção sem considerar vencimento</label>
-      <select id="toggleIgnorarVencimento">
-        <option value="nao">Não</option>
-        <option value="sim">Sim</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="ipcaHistoricoFallback">IPCA médio anual fallback (%)</label>
-      <input id="ipcaHistoricoFallback" type="number" step="0.01" placeholder="Usado se não houver CSV/IPCA histórico suficiente" />
-    </div>
-    <div class="field">
-      <label for="ipcaExplicacao">Observação</label>
-      <input id="ipcaExplicacao" type="text" value="Se a data de referência ficar em branco, usa a última disponível no CSV." disabled />
-    </div>
-  </div>
+    <section id="summarySection" class="card hidden">
+      <h2>Totalização do filtro</h2>
+      <div id="summaryGrid" class="summary-grid"></div>
+    </section>
 
-  <div class="card" style="margin-top:16px; padding:16px;">
-    <h3 style="margin-bottom: 12px;">Cenário futuro por blocos de 6 meses — SELIC/CDI média anual (%)</h3>
-    <div class="controls">
-      <div class="field"><label for="selic_6">0–6m</label><input id="selic_6" type="number" step="0.01" placeholder="em branco = última taxa do CDI" /></div>
-      <div class="field"><label for="selic_12">6–12m</label><input id="selic_12" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="selic_18">12–18m</label><input id="selic_18" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="selic_24">18–24m</label><input id="selic_24" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="selic_30">24–30m</label><input id="selic_30" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="selic_36">30–36m</label><input id="selic_36" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="selic_42">36–42m</label><input id="selic_42" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="selic_48">42–48m</label><input id="selic_48" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="selic_54">48–54m</label><input id="selic_54" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="selic_60">54–60m</label><input id="selic_60" type="number" step="0.01" placeholder="opcional" /></div>
-    </div>
-  </div>
-
-  <div class="card" style="margin-top:16px; padding:16px;">
-    <h3 style="margin-bottom: 12px;">Cenário futuro por blocos de 6 meses — IPCA médio anual (%)</h3>
-    <div class="controls">
-      <div class="field"><label for="ipca_6">0–6m</label><input id="ipca_6" type="number" step="0.01" placeholder="em branco = último IPCA disponível ou fallback" /></div>
-      <div class="field"><label for="ipca_12">6–12m</label><input id="ipca_12" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="ipca_18">12–18m</label><input id="ipca_18" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="ipca_24">18–24m</label><input id="ipca_24" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="ipca_30">24–30m</label><input id="ipca_30" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="ipca_36">30–36m</label><input id="ipca_36" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="ipca_42">36–42m</label><input id="ipca_42" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="ipca_48">42–48m</label><input id="ipca_48" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="ipca_54">48–54m</label><input id="ipca_54" type="number" step="0.01" placeholder="opcional" /></div>
-      <div class="field"><label for="ipca_60">54–60m</label><input id="ipca_60" type="number" step="0.01" placeholder="opcional" /></div>
-    </div>
-  </div>
-
-  <div class="footer-note" style="margin-top:12px;">
-    A data de referência é opcional. Se ficar em branco, o painel usa a última data disponível no <code>serie_cdi.csv</code>.
-    Se você preencher, ele usa a última data do CSV menor ou igual à data informada. O IPCA histórico é lido de
-    <code>serie_ipca.csv</code> quando o arquivo existir e tiver dados compatíveis. Caso contrário, o sistema usa o
-    IPCA médio anual fallback informado acima.
-  </div>
-  <div class="actions">
-    <button id="btnProcessar">Processar</button>
-    <button id="btnExportar" class="secondary" disabled>Exportar resultado em Excel</button>
-    <button id="btnLimpar" class="ghost">Limpar</button>
-  </div>
-  <div id="status" class="status"></div>
-</section>
-
-<section id="painelResumo" class="grid grid-4 hidden" style="margin-bottom: 16px;"></section>
-
-    <section id="painelFiltros" class="card hidden" style="margin-bottom: 16px;">
+    <section id="filtersSection" class="card hidden">
       <h2>Filtros</h2>
-      <div class="controls">
+      <div class="grid grid-4">
         <div class="field">
-          <label for="filtroBusca">Buscar por ativo, código, produto ou emissor</label>
-          <input id="filtroBusca" type="text" placeholder="Digite parte do nome, código ou emissor" />
+          <label for="busca">Buscar por produto, código ou emissor</label>
+          <input id="busca" type="text" placeholder="Ex.: BTG, CDB, CDB4260PO8N" />
         </div>
         <div class="field">
-          <label for="filtroEmissor">Emissor</label>
-          <select id="filtroEmissor">
+          <label for="indexadorFiltro">Indexador</label>
+          <select id="indexadorFiltro">
             <option value="">Todos</option>
           </select>
         </div>
         <div class="field">
-          <label for="filtroIndexador">Indexador</label>
-          <select id="filtroIndexador">
+          <label for="emissorIncluir">Emissor - incluir</label>
+          <select id="emissorIncluir">
             <option value="">Todos</option>
-            <option value="DI">DI</option>
-            <option value="PREFIXADO">PREFIXADO</option>
-            <option value="IPCA">IPCA</option>
           </select>
         </div>
         <div class="field">
-          <label for="filtroOrdenar">Ordenar por</label>
-          <select id="filtroOrdenar">
-            <option value="Nome do ativo">Nome do ativo</option>
+          <label for="emissorExcluir">Emissor - excluir</label>
+          <select id="emissorExcluir">
+            <option value="">Nenhum</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-3" style="margin-top: 14px;">
+        <div class="field">
+          <label for="ordenarPor">Ordenar por</label>
+          <select id="ordenarPor">
+            <option value="Produto painel">Produto</option>
+            <option value="Emissor painel">Emissor</option>
             <option value="Valor Atualizado CURVA">Valor na curva</option>
-            <option value="Valor proj 6m">Valor em 6 meses</option>
-            <option value="Valor proj 12m">Valor em 12 meses</option>
-            <option value="Valor proj 18m">Valor em 18 meses</option>
-            <option value="Valor proj 24m">Valor em 24 meses</option>
-            <option value="Valor proj 30m">Valor em 30 meses</option>
-            <option value="Valor proj 36m">Valor em 36 meses</option>
-            <option value="Valor proj 42m">Valor em 42 meses</option>
-            <option value="Valor proj 48m">Valor em 48 meses</option>
-            <option value="Valor proj 54m">Valor em 54 meses</option>
-            <option value="Valor proj 60m">Valor em 60 meses</option>
-            <option value="% CDI estimado">% CDI estimado</option>
-            <option value="Taxa prefixada estimada (% a.a.)">Taxa prefixada estimada</option>
-            <option value="Taxa real IPCA estimada (% a.a.)">Taxa real IPCA estimada</option>
-            <option value="Taxa equivalente anual histórica (%)">Taxa equivalente anual</option>
+            <option value="Valor projetado painel">Valor projetado</option>
+            <option value="Taxa painel">Taxa</option>
           </select>
         </div>
         <div class="field">
-          <label for="filtroDirecao">Direção</label>
-          <select id="filtroDirecao">
+          <label for="direcaoOrdenacao">Direção</label>
+          <select id="direcaoOrdenacao">
             <option value="asc">Crescente</option>
             <option value="desc">Decrescente</option>
           </select>
         </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <div class="note">O CSV opcional <code>compras_secundario.csv</code> deve ter: <code>codigo,data_aquisicao,valor_aquisicao</code>.</div>
+        </div>
       </div>
     </section>
 
-    <section id="painelTotalizacao" class="card hidden" style="margin-bottom: 16px;">
-      <h2>Totalização do filtro atual</h2>
-      <div id="totalizacaoGrid" class="grid grid-4"></div>
-    </section>
-
-    <section id="painelTabela" class="card hidden">
-      <h2>Resultados</h2>
+    <section id="tableSection" class="card hidden">
+      <h2>Painel</h2>
       <div class="table-wrap">
-        <table id="tabelaResultados">
-          <thead></thead>
-          <tbody></tbody>
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
         </table>
-      </div>
-      <div class="footer-note">
-        Clique no cabeçalho de uma coluna para ordenar. Você pode projetar respeitando o vencimento ou ignorando-o.
-        Para DI, o cenário futuro usa a SELIC/CDI média informada por bloco de 6 meses. Para IPCA, o cenário futuro usa
-        o IPCA médio informado por bloco de 6 meses; se o campo estiver vazio, usa o último IPCA disponível no CSV ou o fallback manual.
       </div>
     </section>
   </div>
 
   <script>
-    const PROJECTION_MONTHS = [6, 12, 18, 24, 30, 36, 42, 48, 54, 60];
+    const state = {
+      results: [],
+      filtered: [],
+      historicoCdi: [],
+      historicoIpca: [],
+      comprasSecundario: [],
+      horizonteMeses: 12,
+      sortColumn: 'Produto painel',
+      sortDirection: 'asc',
+      caminhos: {
+        cdi: './serie_cdi.csv',
+        ipca: './serie_ipca.csv',
+        compras: './compras_secundario.csv'
+      }
+    };
 
-const state = {
-  dfResultado: [],
-  dfProcessaveis: [],
-  dfCdi: [],
-  dfIpca: [],
-  filtered: [],
-  sortColumn: 'Nome do ativo',
-  sortDirection: 'asc',
-  cdiCsvPath: './serie_cdi.csv',
-  ipcaCsvPath: './serie_ipca.csv',
-};
+    const colsTabela = [
+      'Produto painel',
+      'Emissor painel',
+      'Código',
+      'Indexador',
+      'Emissão painel',
+      'Vencimento painel',
+      'Taxa painel',
+      'Valor Atualizado CURVA',
+      'Valor projetado painel',
+      'Data aquisição',
+      'Valor aquisição',
+      'Taxa compra secundário'
+    ];
 
-const TABLE_COLUMNS = [
-  'Nome do ativo',
-  'Indexador',
-  'Emissor filtro',
-  'Código',
-  'Preço Atualizado CURVA',
-  'Valor Atualizado CURVA',
-  '% CDI estimado',
-  'Taxa prefixada estimada (% a.a.)',
-  'Taxa real IPCA estimada (% a.a.)',
-  'Taxa equivalente anual histórica (%)',
-  'Valor proj 6m',
-  'Valor proj 12m',
-  'Valor proj 18m',
-  'Valor proj 24m',
-  'Valor proj 30m',
-  'Valor proj 36m',
-  'Valor proj 42m',
-  'Valor proj 48m',
-  'Valor proj 54m',
-  'Valor proj 60m',
-  'Vencimento'
-];
+    const numericCols = new Set([
+      'Valor Atualizado CURVA',
+      'Valor projetado painel',
+      'Valor aquisição'
+    ]);
 
-const numericColumns = new Set([
-  'Preço Atualizado CURVA',
-  'Valor Atualizado CURVA',
-  '% CDI estimado',
-  'Taxa prefixada estimada (% a.a.)',
-  'Taxa real IPCA estimada (% a.a.)',
-  'Taxa equivalente anual histórica (%)',
-  'Valor proj 6m',
-  'Valor proj 12m',
-  'Valor proj 18m',
-  'Valor proj 24m',
-  'Valor proj 30m',
-  'Valor proj 36m',
-  'Valor proj 42m',
-  'Valor proj 48m',
-  'Valor proj 54m',
-  'Valor proj 60m'
-]);
+    const el = {
+      arquivoPosicao: document.getElementById('arquivoPosicao'),
+      nomeAba: document.getElementById('nomeAba'),
+      dataRef: document.getElementById('dataRef'),
+      tipoProjecao: document.getElementById('tipoProjecao'),
+      cdiFuturo: document.getElementById('cdiFuturo'),
+      ipcaFuturo: document.getElementById('ipcaFuturo'),
+      ignorarVencimento: document.getElementById('ignorarVencimento'),
+      usarCsvIpca: document.getElementById('usarCsvIpca'),
+      btnProcessar: document.getElementById('btnProcessar'),
+      btnExportar: document.getElementById('btnExportar'),
+      btnLimpar: document.getElementById('btnLimpar'),
+      status: document.getElementById('status'),
+      summarySection: document.getElementById('summarySection'),
+      summaryGrid: document.getElementById('summaryGrid'),
+      filtersSection: document.getElementById('filtersSection'),
+      tableSection: document.getElementById('tableSection'),
+      busca: document.getElementById('busca'),
+      indexadorFiltro: document.getElementById('indexadorFiltro'),
+      emissorIncluir: document.getElementById('emissorIncluir'),
+      emissorExcluir: document.getElementById('emissorExcluir'),
+      ordenarPor: document.getElementById('ordenarPor'),
+      direcaoOrdenacao: document.getElementById('direcaoOrdenacao'),
+      thead: document.getElementById('thead'),
+      tbody: document.getElementById('tbody')
+    };
 
-const el = {
-  arquivoPosicao: document.getElementById('arquivoPosicao'),
-  nomeAba: document.getElementById('nomeAba'),
-  dataRef: document.getElementById('dataRef'),
-  cdiPath: document.getElementById('cdiPath'),
-  ipcaPath: document.getElementById('ipcaPath'),
-  toggleIgnorarVencimento: document.getElementById('toggleIgnorarVencimento'),
-  ipcaHistoricoFallback: document.getElementById('ipcaHistoricoFallback'),
-  btnProcessar: document.getElementById('btnProcessar'),
-  btnExportar: document.getElementById('btnExportar'),
-  btnLimpar: document.getElementById('btnLimpar'),
-  status: document.getElementById('status'),
-  painelResumo: document.getElementById('painelResumo'),
-  painelFiltros: document.getElementById('painelFiltros'),
-  painelTotalizacao: document.getElementById('painelTotalizacao'),
-  totalizacaoGrid: document.getElementById('totalizacaoGrid'),
-  painelTabela: document.getElementById('painelTabela'),
-  filtroBusca: document.getElementById('filtroBusca'),
-  filtroEmissor: document.getElementById('filtroEmissor'),
-  filtroIndexador: document.getElementById('filtroIndexador'),
-  filtroOrdenar: document.getElementById('filtroOrdenar'),
-  filtroDirecao: document.getElementById('filtroDirecao'),
-  tabelaHead: document.querySelector('#tabelaResultados thead'),
-  tabelaBody: document.querySelector('#tabelaResultados tbody'),
-};
-
-    function setStatus(text) {
-      el.status.textContent = text || '';
-    }
-
-    function brNumber(v, digits = 2) {
-      if (v === null || v === undefined || Number.isNaN(v)) return '-';
-      return Number(v).toLocaleString('pt-BR', {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits
-      });
-    }
-
-    function brDate(v) {
+    function setStatus(msg) { el.status.textContent = msg || ''; }
+    function fmtNum(v, d = 2) { return Number.isFinite(v) ? v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '-'; }
+    function fmtDate(v) {
       if (!v) return '-';
       const d = new Date(v);
-      if (Number.isNaN(d.getTime())) return '-';
-      return d.toLocaleDateString('pt-BR');
+      return Number.isNaN(d.getTime()) ? '-' : d.toLocaleDateString('pt-BR');
     }
+    function esc(s) { return String(s ?? '-').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
 
-    function parseNumeroBrasileiro(valor) {
+    function parseNumero(valor) {
       if (valor === null || valor === undefined || valor === '') return NaN;
       if (typeof valor === 'number') return valor;
       let s = String(valor).trim();
       if (['', '-', 'nan', 'None', 'NaT'].includes(s)) return NaN;
-      if (s.includes('.') && s.includes(',')) {
-        s = s.replace(/\./g, '').replace(',', '.');
-      } else if (s.includes(',')) {
-        s = s.replace(',', '.');
-      }
-      const num = Number(s);
-      return Number.isFinite(num) ? num : NaN;
+      if (s.includes('.') && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+      else if (s.includes(',')) s = s.replace(',', '.');
+      const n = Number(s);
+      return Number.isFinite(n) ? n : NaN;
     }
 
-    function anualParaDiaria(taxaAnualPercentual) {
-      const taxaAnualDecimal = taxaAnualPercentual / 100;
-      return Math.pow(1 + taxaAnualDecimal, 1 / 252) - 1;
+    function excelDateToISO(value) {
+      if (value === null || value === undefined || value === '') return null;
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())).toISOString();
+      }
+      if (typeof value === 'number') {
+        const utcDays = Math.floor(value - 25569);
+        return new Date(utcDays * 86400 * 1000).toISOString();
+      }
+      if (typeof value === 'string') {
+        const s = value.trim();
+        let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (m) return new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]))).toISOString();
+        m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).toISOString();
+        const d = new Date(s);
+        if (!Number.isNaN(d.getTime())) return d.toISOString();
+      }
+      return null;
     }
 
-    function chooseFirstExisting(columns, preferences) {
-      return preferences.find(c => columns.includes(c)) || null;
-    }
-
-    function normalizarIndexador(valor) {
-  const s = String(valor ?? '').trim().toUpperCase();
-  if (['PRÉ', 'PRE', 'PRÉ-FIXADO', 'PRE-FIXADO', 'PREFIXADO'].includes(s)) return 'PREFIXADO';
-  if (['IPCA', 'IPCA+', 'IPCA +', 'IPC-A', 'IPC-A+', 'IPC-A +'].includes(s)) return 'IPCA';
-  if (s === 'DI' || s === 'CDI') return 'DI';
-  return s;
-}
-
-function isIndexadorProcessavel(valor) {
-  return ['DI', 'PREFIXADO', 'IPCA'].includes(normalizarIndexador(valor));
-}
-
-function equivalenteAnual(razaoPu, nDiasUteis) {
-      if (!Number.isFinite(razaoPu) || razaoPu <= 0 || !Number.isFinite(nDiasUteis) || nDiasUteis <= 0) return NaN;
-      return (Math.pow(razaoPu, 252 / nDiasUteis) - 1) * 100;
-    }
-
-    function estimarPrefixado(valorUnitario, puObservado, nDiasUteis) {
-      if (!Number.isFinite(valorUnitario) || !Number.isFinite(puObservado) || !Number.isFinite(nDiasUteis) || nDiasUteis <= 0) {
-        return { taxaDiaria: NaN, taxaAnual: NaN, pu: NaN, erro: NaN };
-      }
-      const razao = puObservado / valorUnitario;
-      if (!Number.isFinite(razao) || razao <= 0) {
-        return { taxaDiaria: NaN, taxaAnual: NaN, pu: NaN, erro: NaN };
-      }
-      const taxaDiaria = Math.pow(razao, 1 / nDiasUteis) - 1;
-      const taxaAnual = (Math.pow(1 + taxaDiaria, 252) - 1) * 100;
-      const pu = valorUnitario * Math.pow(1 + taxaDiaria, nDiasUteis);
-      return { taxaDiaria, taxaAnual, pu, erro: pu - puObservado };
-    }
-
-    function inferirValorUnitario(valorAtualizadoCurva, qtdDisponivel, precoCurva) {
-      const candidates = [1, 100, 500, 1000];
-
-      const nearest = (value) => {
-        if (!Number.isFinite(value) || value <= 0) return NaN;
-        return candidates.reduce(
-          (best, curr) => Math.abs(curr - value) < Math.abs(best - value) ? curr : best,
-          candidates[0]
-        );
-      };
-
-      if (Number.isFinite(precoCurva) && precoCurva > 0) {
-        const nearPrice = nearest(precoCurva);
-        const diffPct = Math.abs(precoCurva - nearPrice) / nearPrice;
-        if (diffPct <= 0.08) return nearPrice;
-      }
-
-      if (Number.isFinite(valorAtualizadoCurva) && Number.isFinite(qtdDisponivel) && qtdDisponivel > 0) {
-        const ratio = valorAtualizadoCurva / qtdDisponivel;
-
-        const qtdSuspeita = !Number.isSafeInteger(qtdDisponivel) || qtdDisponivel > 1e12;
-        const ratioSuspeito = !Number.isFinite(ratio) || ratio <= 0 || ratio < 0.5 || ratio > 2000;
-
-        if (!qtdSuspeita && !ratioSuspeito) {
-          return nearest(ratio);
-        }
-      }
-
-      if (Number.isFinite(precoCurva) && precoCurva > 0) {
-        return nearest(precoCurva);
-      }
-
-      return NaN;
-    }
-
-    function puModelado(valorUnitario, taxasDiarias, fator) {
-      if (!Number.isFinite(valorUnitario)) return NaN;
-      if (!taxasDiarias.length) return valorUnitario;
-      let acumulado = 1;
-      for (const taxa of taxasDiarias) acumulado *= (1 + fator * taxa);
-      return valorUnitario * acumulado;
-    }
-
-    function estimarFatorEmissao(valorUnitario, puObservado, taxasDiarias) {
-      if (!Number.isFinite(valorUnitario) || !Number.isFinite(puObservado)) {
-        return { fator: NaN, pu: NaN, erro: NaN };
-      }
-
-      if (!taxasDiarias.length) {
-        if (Math.abs(puObservado - valorUnitario) < 1e-12) {
-          return { fator: 0, pu: valorUnitario, erro: 0 };
-        }
-        return { fator: NaN, pu: NaN, erro: NaN };
-      }
-
-      const f = (x) => puModelado(valorUnitario, taxasDiarias, x) - puObservado;
-      let a = 0;
-      let b = 3;
-      let fa = f(a);
-      let fb = f(b);
-
-      while ((!Number.isFinite(fa) || !Number.isFinite(fb) || fa * fb > 0) && b < 20) {
-        b *= 2;
-        fb = f(b);
-      }
-
-      if (!Number.isFinite(fa) || !Number.isFinite(fb) || fa * fb > 0) {
-        return { fator: NaN, pu: NaN, erro: NaN };
-      }
-
-      for (let i = 0; i < 300; i++) {
-        const m = (a + b) / 2;
-        const fm = f(m);
-        if (Math.abs(fm) < 1e-12 || Math.abs(b - a) < 1e-12) {
-          const pu = puModelado(valorUnitario, taxasDiarias, m);
-          return { fator: m, pu, erro: pu - puObservado };
-        }
-        if (fa * fm <= 0) {
-          b = m;
-          fb = fm;
-        } else {
-          a = m;
-          fa = fm;
-        }
-      }
-
-      const m = (a + b) / 2;
-      const pu = puModelado(valorUnitario, taxasDiarias, m);
-      return { fator: m, pu, erro: pu - puObservado };
-    }
-
-    function busdayCount(startDate, endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      if (end <= start) return 0;
-      let count = 0;
-      const current = new Date(start);
-      while (current < end) {
-        const day = current.getDay();
-        if (day !== 0 && day !== 6) count += 1;
-        current.setDate(current.getDate() + 1);
-      }
-      return count;
-    }
-
-    function addMonths(dateValue, months) {
-      const d = new Date(dateValue);
-      const day = d.getUTCDate();
-      d.setUTCMonth(d.getUTCMonth() + months);
-      if (d.getUTCDate() < day) d.setUTCDate(0);
-      return d;
-    }
-
-    function projetarPuFuturo(puBase, fatorEmissao, taxaDiariaConstante, nDiasUteis) {
-      if (![puBase, fatorEmissao, taxaDiariaConstante].every(Number.isFinite)) return NaN;
-      if (nDiasUteis <= 0) return puBase;
-      const fatorDiarioAtivo = 1 + fatorEmissao * taxaDiariaConstante;
-      return puBase * Math.pow(fatorDiarioAtivo, nDiasUteis);
-    }
-
-    function parseCSV(text) {
-      const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
-      if (!lines.length) return [];
-      const delimiter = lines[0].includes(';') ? ';' : ',';
-      const headers = splitCsvLine(lines[0], delimiter).map(h => h.trim());
-      return lines.slice(1).map(line => {
-        const parts = splitCsvLine(line, delimiter);
-        const obj = {};
-        headers.forEach((h, i) => { obj[h] = (parts[i] ?? '').trim(); });
-        return obj;
-      });
+    async function readExcel(file, sheetName) {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+      const actualSheet = wb.Sheets[sheetName] ? sheetName : wb.SheetNames[0];
+      const sheet = wb.Sheets[actualSheet];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
+      return { rows, actualSheet };
     }
 
     function splitCsvLine(line, delimiter) {
@@ -706,736 +348,424 @@ function equivalenteAnual(razaoPu, nDiasUteis) {
       for (let i = 0; i < line.length; i++) {
         const ch = line[i];
         if (ch === '"') {
-          if (inQuotes && line[i + 1] === '"') {
-            current += '"';
-            i++;
-          } else {
-            inQuotes = !inQuotes;
-          }
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+          else inQuotes = !inQuotes;
         } else if (ch === delimiter && !inQuotes) {
-          result.push(current);
-          current = '';
-        } else {
-          current += ch;
-        }
+          result.push(current); current = '';
+        } else current += ch;
       }
       result.push(current);
       return result;
     }
 
-    function excelDateToISO(value) {
-      if (value === null || value === undefined || value === '') return null;
+    function parseCsv(text) {
+      const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+      if (!lines.length) return [];
+      const delimiter = lines[0].includes(';') ? ';' : ',';
+      const headers = splitCsvLine(lines[0], delimiter).map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const parts = splitCsvLine(line, delimiter);
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = (parts[i] ?? '').trim());
+        return obj;
+      });
+    }
 
-      if (value instanceof Date && !Number.isNaN(value.getTime())) {
-        return new Date(Date.UTC(
-          value.getFullYear(),
-          value.getMonth(),
-          value.getDate()
-        )).toISOString();
+    async function fetchOptionalCsv(path) {
+      try {
+        const res = await fetch(path, { cache: 'no-store' });
+        if (!res.ok) return [];
+        return parseCsv(await res.text());
+      } catch {
+        return [];
       }
+    }
 
-      if (typeof value === 'number') {
-        const utcDays = Math.floor(value - 25569);
-        const utcValue = utcDays * 86400;
-        return new Date(utcValue * 1000).toISOString();
-      }
+    function annualToDaily(annualPct) {
+      return Math.pow(1 + annualPct / 100, 1 / 252) - 1;
+    }
+    function annualToMonthly(annualPct) {
+      return Math.pow(1 + annualPct / 100, 1 / 12) - 1;
+    }
 
-      if (typeof value === 'string') {
-        const s = value.trim();
+    function prepararCdi(rows) {
+      return rows.map(r => ({
+        data: excelDateToISO(r.data),
+        taxa_anual_percentual: parseNumero(r.taxa_anual_percentual),
+        taxa_diaria_decimal: Number.isFinite(parseNumero(r.taxa_diaria_decimal)) ? parseNumero(r.taxa_diaria_decimal) : annualToDaily(parseNumero(r.taxa_anual_percentual))
+      }))
+      .filter(r => r.data && Number.isFinite(r.taxa_diaria_decimal))
+      .sort((a,b) => new Date(a.data) - new Date(b.data));
+    }
 
-        let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        if (m) {
-          const [, dd, mm, yyyy] = m;
-          return new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd))).toISOString();
+    function prepararIpca(rows) {
+      const candidateCols = ['ipca_mensal_percentual','ipca_percentual','ipca','valor','percentual'];
+      return rows.map(r => {
+        let mensal = NaN;
+        for (const c of candidateCols) {
+          if (Object.prototype.hasOwnProperty.call(r, c)) { mensal = parseNumero(r[c]); if (Number.isFinite(mensal)) break; }
         }
-
-        m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (m) {
-          const [, yyyy, mm, dd] = m;
-          return new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd))).toISOString();
-        }
-
-        const d = new Date(s);
-        if (!Number.isNaN(d.getTime())) return d.toISOString();
-      }
-
-      return null;
+        return { data: excelDateToISO(r.data), ipca_mensal_percentual: mensal };
+      }).filter(r => r.data && Number.isFinite(r.ipca_mensal_percentual)).sort((a,b)=>new Date(a.data)-new Date(b.data));
     }
 
-    async function readExcel(file, sheetName) {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-      const actualSheet = workbook.Sheets[sheetName] ? sheetName : workbook.SheetNames[0];
-      const sheet = workbook.Sheets[actualSheet];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
-      return { rows, actualSheet };
+    function prepararCompras(rows) {
+      const out = rows.map(r => ({
+        codigo: String(r.codigo ?? r.Código ?? r.codigo_ativo ?? '').trim(),
+        data_aquisicao: excelDateToISO(r.data_aquisicao ?? r.data ?? r.DataAquisição),
+        valor_aquisicao: parseNumero(r.valor_aquisicao ?? r.valor ?? r.ValorAquisição)
+      })).filter(r => r.codigo && r.data_aquisicao && Number.isFinite(r.valor_aquisicao));
+      const map = new Map();
+      out.forEach(r => { if (!map.has(r.codigo)) map.set(r.codigo, r); });
+      return map;
     }
 
-    async function fetchCsvFromRepo(path) {
-      const response = await fetch(path, { cache: 'no-store' });
-      if (!response.ok) {
-        throw new Error(`Não foi possível carregar o CSV em ${path}.`);
-      }
-      const text = await response.text();
-      return parseCSV(text);
-    }
-
-function respeitarVencimento() {
-  return el.toggleIgnorarVencimento.value !== 'sim';
-}
-
-function parseMonthlyPercent(row) {
-  const candidates = [
-    'ipca_mensal_percentual',
-    'ipca_percentual',
-    'ipca',
-    'valor',
-    'percentual'
-  ];
-  for (const c of candidates) {
-    if (Object.prototype.hasOwnProperty.call(row, c)) {
-      const v = parseNumeroBrasileiro(row[c]);
-      if (Number.isFinite(v)) return v;
-    }
-  }
-  return NaN;
-}
-
-function prepararDfIpca(rows) {
-  if (!rows || !rows.length) return [];
-  if (!Object.prototype.hasOwnProperty.call(rows[0], 'data')) return [];
-  const out = rows.map(r => ({ ...r }));
-  for (const row of out) {
-    row.data = excelDateToISO(row.data);
-    row.ipca_mensal_percentual = parseMonthlyPercent(row);
-  }
-  return out
-    .filter(r => r.data && Number.isFinite(r.ipca_mensal_percentual))
-    .sort((a, b) => new Date(a.data) - new Date(b.data))
-    .filter((row, idx, arr) => idx === arr.findLastIndex(x => {
-      const d1 = new Date(x.data); const d2 = new Date(row.data);
-      return d1.getUTCFullYear() === d2.getUTCFullYear() && d1.getUTCMonth() === d2.getUTCMonth();
-    }));
-}
-
-function monthKey(dateValue) {
-  const d = new Date(dateValue);
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
-}
-
-function obterIpcaBaseAnual(dfIpca, dataRef, fallbackAnnual) {
-  const elegiveis = (dfIpca || []).filter(r => new Date(r.data) <= new Date(dataRef));
-  if (elegiveis.length >= 12) {
-    const last12 = elegiveis.slice(-12);
-    let fator = 1;
-    for (const row of last12) fator *= (1 + row.ipca_mensal_percentual / 100);
-    return (fator - 1) * 100;
-  }
-  if (elegiveis.length) {
-    const last = elegiveis[elegiveis.length - 1].ipca_mensal_percentual;
-    return (Math.pow(1 + last / 100, 12) - 1) * 100;
-  }
-  return Number.isFinite(fallbackAnnual) ? fallbackAnnual : NaN;
-}
-
-function calcularFatorIpcaHistorico(dfIpca, dataInicio, dataFim, fallbackAnnual) {
-  const inicio = new Date(dataInicio);
-  const fim = new Date(dataFim);
-  const inicioKey = monthKey(inicio);
-  const fimKey = monthKey(fim);
-
-  const elegiveis = (dfIpca || []).filter(r => {
-    const key = monthKey(r.data);
-    return key > inicioKey && key <= fimKey;
-  });
-
-  if (elegiveis.length) {
-    let fator = 1;
-    for (const row of elegiveis) fator *= (1 + row.ipca_mensal_percentual / 100);
-    return { fatorInflacao: fator, fonte: 'csv', observacoes: elegiveis.length };
-  }
-
-  const dias = busdayCount(inicio, fim);
-  if (Number.isFinite(fallbackAnnual) && dias > 0) {
-    const fator = Math.pow(1 + fallbackAnnual / 100, dias / 252);
-    return { fatorInflacao: fator, fonte: 'fallback', observacoes: dias };
-  }
-
-  return { fatorInflacao: NaN, fonte: 'indisponível', observacoes: 0 };
-}
-
-function estimarIpca(valorUnitario, puObservado, nDiasUteis, fatorInflacao) {
-  if (!Number.isFinite(valorUnitario) || !Number.isFinite(puObservado) || !Number.isFinite(nDiasUteis) || nDiasUteis <= 0 || !Number.isFinite(fatorInflacao) || fatorInflacao <= 0) {
-    return { taxaRealAnual: NaN, taxaRealDiaria: NaN, pu: NaN, erro: NaN };
-  }
-  const baseReal = puObservado / (valorUnitario * fatorInflacao);
-  if (!Number.isFinite(baseReal) || baseReal <= 0) {
-    return { taxaRealAnual: NaN, taxaRealDiaria: NaN, pu: NaN, erro: NaN };
-  }
-  const taxaRealDiaria = Math.pow(baseReal, 1 / nDiasUteis) - 1;
-  const taxaRealAnual = (Math.pow(1 + taxaRealDiaria, 252) - 1) * 100;
-  const pu = valorUnitario * fatorInflacao * Math.pow(1 + taxaRealDiaria, nDiasUteis);
-  return { taxaRealAnual, taxaRealDiaria, pu, erro: pu - puObservado };
-}
-
-function annualPercentToDailyDecimal(annualPercent) {
-  if (!Number.isFinite(annualPercent)) return NaN;
-  return Math.pow(1 + annualPercent / 100, 1 / 252) - 1;
-}
-
-function getBlockAnnual(prefix, blockEndMonths, fallbackAnnual) {
-  const input = document.getElementById(`${prefix}_${blockEndMonths}`);
-  const val = parseNumeroBrasileiro(input?.value);
-  return Number.isFinite(val) ? val : fallbackAnnual;
-}
-
-function getScenarioConfig(dfCdi, dfIpca, dataRefEfetiva) {
-  const linhaRef = dfCdi.find(r => r.data === dataRefEfetiva) || dfCdi[dfCdi.length - 1];
-  const cdiAnnualDefault = linhaRef?.taxa_anual_percentual;
-  const ipcaFallback = parseNumeroBrasileiro(el.ipcaHistoricoFallback.value);
-  const ipcaAnnualDefault = obterIpcaBaseAnual(dfIpca, dataRefEfetiva, ipcaFallback);
-
-  const blocks = {};
-  let previous = 0;
-  for (const endMonth of PROJECTION_MONTHS) {
-    blocks[endMonth] = {
-      startMonth: previous,
-      endMonth,
-      selicAnnual: getBlockAnnual('selic', endMonth, cdiAnnualDefault),
-      ipcaAnnual: getBlockAnnual('ipca', endMonth, ipcaAnnualDefault),
-    };
-    previous = endMonth;
-  }
-
-  return {
-    respeitarVencimento: respeitarVencimento(),
-    ipcaFallback,
-    cdiAnnualDefault,
-    ipcaAnnualDefault,
-    blocks,
-  };
-}
-
-function fatorCrescimentoBloco(indexador, item, block, nDias) {
-  if (!Number.isFinite(nDias) || nDias <= 0) return 1;
-  if (indexador === 'DI') {
-    const dailySelic = annualPercentToDailyDecimal(block.selicAnnual);
-    if (!Number.isFinite(item['Fator emissão (decimal)']) || !Number.isFinite(dailySelic)) return NaN;
-    return Math.pow(1 + item['Fator emissão (decimal)'] * dailySelic, nDias);
-  }
-  if (indexador === 'PREFIXADO') {
-    const daily = item['Taxa prefixada diária'];
-    if (!Number.isFinite(daily)) return NaN;
-    return Math.pow(1 + daily, nDias);
-  }
-  if (indexador === 'IPCA') {
-    const dailyIpca = annualPercentToDailyDecimal(block.ipcaAnnual);
-    const dailyReal = item['Taxa real IPCA diária'];
-    if (!Number.isFinite(dailyIpca) || !Number.isFinite(dailyReal)) return NaN;
-    return Math.pow((1 + dailyIpca) * (1 + dailyReal), nDias);
-  }
-  return NaN;
-}
-
-function projetarPorBlocos(indexador, item, dataRefEfetiva, dataFutura, scenario) {
-  let pu = item['Preço Atualizado CURVA'];
-  if (!Number.isFinite(pu)) return NaN;
-
-  for (const endMonth of PROJECTION_MONTHS) {
-    const block = scenario.blocks[endMonth];
-    const blockStartDate = addMonths(dataRefEfetiva, block.startMonth);
-    const blockEndDate = addMonths(dataRefEfetiva, block.endMonth);
-    const effectiveEnd = new Date(Math.min(blockEndDate.getTime(), new Date(dataFutura).getTime()));
-    if (effectiveEnd <= blockStartDate) continue;
-    const dias = busdayCount(blockStartDate, effectiveEnd);
-    const fator = fatorCrescimentoBloco(indexador, item, block, dias);
-    if (!Number.isFinite(fator)) return NaN;
-    pu *= fator;
-    if (+effectiveEnd >= +new Date(dataFutura)) break;
-  }
-  return pu;
-}
-
-    function prepararDfCdi(rows) {
-      const out = rows.map(r => ({ ...r }));
-      if (!out.length) throw new Error('O CSV do CDI está vazio.');
-      if (!Object.prototype.hasOwnProperty.call(out[0], 'data')) {
-        throw new Error("O CSV do CDI precisa ter a coluna 'data'.");
-      }
-
-      for (const row of out) {
-        row.data = excelDateToISO(row.data);
-        row.taxa_anual_percentual = parseNumeroBrasileiro(row.taxa_anual_percentual);
-        row.taxa_diaria_decimal = parseNumeroBrasileiro(row.taxa_diaria_decimal);
-        if (!Number.isFinite(row.taxa_diaria_decimal) && Number.isFinite(row.taxa_anual_percentual)) {
-          row.taxa_diaria_decimal = anualParaDiaria(row.taxa_anual_percentual);
-        }
-      }
-
-      return out
-        .filter(r => r.data && Number.isFinite(r.taxa_diaria_decimal))
-        .sort((a, b) => new Date(a.data) - new Date(b.data))
-        .filter((row, idx, arr) => idx === arr.findLastIndex(x => x.data === row.data));
-    }
-
-    function prepararDfPosicao(rows) {
-      if (!rows.length) throw new Error('A planilha de posição está vazia.');
-      const first = rows[0];
-      for (const col of ['Indexador', 'Data de Emissão', 'Vencimento']) {
-        if (!Object.prototype.hasOwnProperty.call(first, col)) {
-          throw new Error(`A planilha precisa ter a coluna '${col}'.`);
-        }
-      }
-
+    function prepararPosicao(rows) {
       return rows.map(r => {
         const row = { ...r };
-        row['Indexador'] = normalizarIndexador(row['Indexador']);
+        row.Indexador = String(row.Indexador ?? '').trim().toUpperCase();
         row['Data de Emissão'] = excelDateToISO(row['Data de Emissão']);
-        row['Vencimento'] = excelDateToISO(row['Vencimento']);
-        for (const col of [
-          'Quantidade',
-          'Quantidade Disponível',
-          'Quantidade Indisponível',
-          'Preço Atualizado MTM',
-          'Valor Atualizado MTM',
-          'Preço Atualizado CURVA',
-          'Valor Atualizado CURVA',
-          'Preço Atualizado FECHAMENTO',
-          'Valor Atualizado FECHAMENTO',
-        ]) {
-          if (Object.prototype.hasOwnProperty.call(row, col)) {
-            row[col] = parseNumeroBrasileiro(row[col]);
-          }
-        }
+        row.Vencimento = excelDateToISO(row.Vencimento);
+        ['Quantidade','Quantidade Disponível','Preço Atualizado CURVA','Valor Atualizado CURVA'].forEach(c => {
+          if (Object.prototype.hasOwnProperty.call(row, c)) row[c] = parseNumero(row[c]);
+        });
         return row;
       });
     }
 
-    function escolherDataRef(dfCdi, dataRefManual) {
-      if (!dataRefManual) return dfCdi[dfCdi.length - 1].data;
-      const target = new Date(dataRefManual);
-      const elegiveis = dfCdi.filter(r => new Date(r.data) <= target);
-      if (!elegiveis.length) {
-        throw new Error('Não há CDI disponível até a data de referência informada.');
-      }
-      return elegiveis[elegiveis.length - 1].data;
-    }
+    function chooseCol(columns, prefs) { return prefs.find(c => columns.includes(c)) || null; }
 
-    function processar(dfPosicao, dfCdi, dfIpca, dataRefManual) {
-  const dfProcessaveis = dfPosicao.filter(r => isIndexadorProcessavel(r['Indexador']));
-  console.log('Total processáveis na planilha:', dfProcessaveis.length);
-
-  if (!dfProcessaveis.length) {
-    throw new Error('Não há ativos DI, PREFIXADO ou IPCA na planilha enviada.');
-  }
-
-  const dataMinima = dfProcessaveis
-    .map(r => r['Data de Emissão'])
-    .filter(Boolean)
-    .map(d => new Date(d))
-    .sort((a, b) => a - b)[0];
-
-  if (!dataMinima || Number.isNaN(dataMinima.getTime())) {
-    throw new Error('Não foi possível identificar uma Data de Emissão válida para os ativos processáveis.');
-  }
-
-  const cdiFiltrado = dfCdi.filter(r => new Date(r.data) >= dataMinima);
-  if (!cdiFiltrado.length) {
-    throw new Error('A série CDI não possui dados suficientes a partir da menor emissão.');
-  }
-
-  const dataRefEfetiva = escolherDataRef(cdiFiltrado, dataRefManual);
-  const linhaRef = cdiFiltrado.find(r => r.data === dataRefEfetiva);
-  const taxaDiariaRef = linhaRef.taxa_diaria_decimal;
-  const taxaAnualRef = linhaRef.taxa_anual_percentual;
-
-  const scenario = getScenarioConfig(cdiFiltrado, dfIpca, dataRefEfetiva);
-
-  const columns = Object.keys(dfProcessaveis[0]);
-  const colNomeAtivo = chooseFirstExisting(columns, ['Ativo', 'Nome do Ativo', 'Produto', 'Código']);
-  const colEmissor = chooseFirstExisting(columns, ['Emissor', 'Instituição']);
-
-  const resultado = [];
-
-  for (const row of dfProcessaveis) {
-    const indexador = normalizarIndexador(row['Indexador']);
-    const qtdDisp = row['Quantidade Disponível'];
-    const valorCurva = row['Valor Atualizado CURVA'];
-    const precoCurva = row['Preço Atualizado CURVA'];
-    const dataEmissao = row['Data de Emissão'];
-    const vencimento = row['Vencimento'];
-
-    if (!dataEmissao || !Number.isFinite(qtdDisp) || qtdDisp <= 0 || !Number.isFinite(precoCurva) || !Number.isFinite(valorCurva)) continue;
-
-    const valorUnitario = inferirValorUnitario(valorCurva, qtdDisp, precoCurva);
-    if (!Number.isFinite(valorUnitario) || valorUnitario <= 0) continue;
-
-    const nDiasHistoricos = busdayCount(dataEmissao, dataRefEfetiva);
-    const taxaEquivalenteAnual = equivalenteAnual(precoCurva / valorUnitario, nDiasHistoricos);
-
-    let fatorCdi = NaN;
-    let taxaPrefixadaAnual = NaN;
-    let taxaPrefixadaDiaria = NaN;
-    let taxaRealIpcaAnual = NaN;
-    let taxaRealIpcaDiaria = NaN;
-    let puHistoricoModelado = NaN;
-    let erroHistorico = NaN;
-    let fonteIpcaHistorica = '-';
-    let inflacaoIpcaHistorica = NaN;
-
-    if (indexador === 'DI') {
-      const taxasDiarias = cdiFiltrado
-        .filter(r => new Date(r.data) > new Date(dataEmissao) && new Date(r.data) <= new Date(dataRefEfetiva))
-        .map(r => r.taxa_diaria_decimal);
-
-      const estimativa = estimarFatorEmissao(valorUnitario, precoCurva, taxasDiarias);
-      fatorCdi = estimativa.fator;
-      puHistoricoModelado = estimativa.pu;
-      erroHistorico = estimativa.erro;
-    } else if (indexador === 'PREFIXADO') {
-      const estimativaPre = estimarPrefixado(valorUnitario, precoCurva, nDiasHistoricos);
-      taxaPrefixadaAnual = estimativaPre.taxaAnual;
-      taxaPrefixadaDiaria = estimativaPre.taxaDiaria;
-      puHistoricoModelado = estimativaPre.pu;
-      erroHistorico = estimativaPre.erro;
-    } else if (indexador === 'IPCA') {
-      const histIpca = calcularFatorIpcaHistorico(dfIpca, dataEmissao, dataRefEfetiva, scenario.ipcaFallback);
-      inflacaoIpcaHistorica = Number.isFinite(histIpca.fatorInflacao) ? (histIpca.fatorInflacao - 1) * 100 : NaN;
-      fonteIpcaHistorica = histIpca.fonte;
-      const estimativaIpca = estimarIpca(valorUnitario, precoCurva, nDiasHistoricos, histIpca.fatorInflacao);
-      taxaRealIpcaAnual = estimativaIpca.taxaRealAnual;
-      taxaRealIpcaDiaria = estimativaIpca.taxaRealDiaria;
-      puHistoricoModelado = estimativaIpca.pu;
-      erroHistorico = estimativaIpca.erro;
-    }
-
-    const item = {
-      'Nome do ativo': row[colNomeAtivo] ?? row['Código'] ?? row['Produto'] ?? '-',
-      'Emissor filtro': row[colEmissor] ?? '-',
-      'Código': row['Código'] ?? '-',
-      'Produto': row['Produto'] ?? '-',
-      'Instituição': row['Instituição'] ?? '-',
-      'Emissor': row['Emissor'] ?? '-',
-      'Indexador': indexador,
-      'Data de Emissão': dataEmissao,
-      'Vencimento': vencimento,
-      'Quantidade': row['Quantidade'],
-      'Quantidade Disponível': qtdDisp,
-      'Preço Atualizado CURVA': precoCurva,
-      'Valor Atualizado CURVA': valorCurva,
-      'Valor unitário inferido': valorUnitario,
-      'Data ref CDI': dataRefEfetiva,
-      'CDI anual da data ref (%)': taxaAnualRef,
-      'CDI diário da data ref': taxaDiariaRef,
-      'N dias históricos': nDiasHistoricos,
-      'Fator emissão (decimal)': fatorCdi,
-      '% CDI estimado': Number.isFinite(fatorCdi) ? fatorCdi * 100 : NaN,
-      'Taxa prefixada estimada (% a.a.)': taxaPrefixadaAnual,
-      'Taxa prefixada diária': taxaPrefixadaDiaria,
-      'Taxa real IPCA estimada (% a.a.)': taxaRealIpcaAnual,
-      'Taxa real IPCA diária': taxaRealIpcaDiaria,
-      'Inflação IPCA histórica acumulada (%)': inflacaoIpcaHistorica,
-      'Fonte IPCA histórica': fonteIpcaHistorica,
-      'Taxa equivalente anual histórica (%)': taxaEquivalenteAnual,
-      'PU modelado histórico': puHistoricoModelado,
-      'Erro PU histórico': erroHistorico,
-      'Erro absoluto histórico': Number.isFinite(erroHistorico) ? Math.abs(erroHistorico) : NaN,
-    };
-
-    for (const meses of PROJECTION_MONTHS) {
-      const dataFutura = addMonths(dataRefEfetiva, meses);
-      item[`Data proj ${meses}m`] = dataFutura.toISOString();
-
-      if (scenario.respeitarVencimento && vencimento && dataFutura > new Date(vencimento)) {
-        item[`Dias úteis proj ${meses}m`] = NaN;
-        item[`PU proj ${meses}m`] = NaN;
-        item[`Valor proj ${meses}m`] = NaN;
-      } else {
-        const dias = busdayCount(dataRefEfetiva, dataFutura);
-        const puProj = projetarPorBlocos(indexador, item, dataRefEfetiva, dataFutura, scenario);
-        item[`Dias úteis proj ${meses}m`] = dias;
-        item[`PU proj ${meses}m`] = puProj;
-        item[`Valor proj ${meses}m`] = Number.isFinite(puProj) && Number.isFinite(qtdDisp)
-          ? puProj * qtdDisp
-          : NaN;
-      }
-    }
-
-    resultado.push(item);
-  }
-
-  resultado.sort((a, b) => {
-    const ea = a['Erro absoluto histórico'];
-    const eb = b['Erro absoluto histórico'];
-    if (!Number.isFinite(ea) && !Number.isFinite(eb)) return 0;
-    if (!Number.isFinite(ea)) return 1;
-    if (!Number.isFinite(eb)) return -1;
-    return ea - eb;
-  });
-
-  return { resultado, dfProcessaveis, cdiFiltrado, dataRefEfetiva, scenario };
-}
-
-    function renderResumo(rows, dataRefEfetiva) {
-  const soma = (campo) => rows.reduce((acc, r) => acc + (Number.isFinite(r[campo]) ? r[campo] : 0), 0);
-  const diCount = rows.filter(r => r['Indexador'] === 'DI').length;
-  const preCount = rows.filter(r => r['Indexador'] === 'PREFIXADO').length;
-  const ipcaCount = rows.filter(r => r['Indexador'] === 'IPCA').length;
-  const html = [
-    cardResumo('Ativos filtrados', String(rows.length), `Data de referência: ${brDate(dataRefEfetiva)}`),
-    cardResumo('DI no filtro', String(diCount), 'Quantidade de ativos DI no recorte atual'),
-    cardResumo('Prefixados no filtro', String(preCount), 'Quantidade de ativos prefixados no recorte atual'),
-    cardResumo('IPCA no filtro', String(ipcaCount), 'Quantidade de ativos IPCA no recorte atual'),
-    cardResumo('Valor na curva', `R$ ${brNumber(soma('Valor Atualizado CURVA'))}`, 'Soma dos valores atuais na curva'),
-    cardResumo('Valor projetado 12m', `R$ ${brNumber(soma('Valor proj 12m'))}`, 'Soma do horizonte de 12 meses'),
-    cardResumo('Valor projetado 60m', `R$ ${brNumber(soma('Valor proj 60m'))}`, 'Soma do horizonte de 60 meses'),
-    cardResumo('% CDI médio', `${brNumber(mediaCampo(rows, '% CDI estimado'))}%`, 'Média simples apenas dos ativos DI'),
-    cardResumo('Taxa prefixada média', `${brNumber(mediaCampo(rows, 'Taxa prefixada estimada (% a.a.)'))}%`, 'Média simples apenas dos prefixados'),
-    cardResumo('Taxa real IPCA média', `${brNumber(mediaCampo(rows, 'Taxa real IPCA estimada (% a.a.)'))}%`, 'Média simples apenas dos IPCA'),
-  ].join('');
-  el.painelResumo.innerHTML = html;
-  el.painelResumo.classList.remove('hidden');
-}
-
-function renderTotalizacao(rows) {
-  const soma = (campo) => rows.reduce((acc, r) => acc + (Number.isFinite(r[campo]) ? r[campo] : 0), 0);
-  const cards = [
-    ['Total de ativos', String(rows.length), 'Total do recorte filtrado'],
-    ['Total na curva', `R$ ${brNumber(soma('Valor Atualizado CURVA'))}`, 'Soma dos valores atuais'],
-  ];
-  for (const meses of PROJECTION_MONTHS) {
-    cards.push([`Total em ${meses} meses`, `R$ ${brNumber(soma(`Valor proj ${meses}m`))}`, `Soma do horizonte de ${meses} meses`]);
-  }
-  el.totalizacaoGrid.innerHTML = cards.map(([a,b,c]) => cardResumo(a,b,c)).join('');
-  el.painelTotalizacao.classList.remove('hidden');
-}
-
-    function mediaCampo(rows, campo) {
-      const vals = rows.map(r => r[campo]).filter(Number.isFinite);
-      if (!vals.length) return NaN;
-      return vals.reduce((a, b) => a + b, 0) / vals.length;
-    }
-
-    function topEmissor(rows) {
-      const map = new Map();
-      for (const row of rows) {
-        const key = row['Emissor filtro'] || '-';
-        map.set(key, (map.get(key) || 0) + 1);
-      }
-      let best = '-';
-      let max = -1;
-      for (const [k, v] of map.entries()) {
-        if (v > max) {
-          best = `${k} (${v})`;
-          max = v;
-        }
+    function inferirValorUnitario(row) {
+      const qtd = row['Quantidade Disponível'];
+      const valorCurva = row['Valor Atualizado CURVA'];
+      const precoCurva = row['Preço Atualizado CURVA'];
+      const candidates = [1,100,500,1000];
+      let best = candidates[0];
+      let score = Infinity;
+      for (const c of candidates) {
+        let s = 0;
+        if (Number.isFinite(precoCurva)) s += Math.abs(precoCurva - c) * 5;
+        if (Number.isFinite(valorCurva) && Number.isFinite(qtd) && qtd > 0 && qtd < 1e12) s += Math.abs((valorCurva/qtd) - c);
+        if (s < score) { score = s; best = c; }
       }
       return best;
     }
 
-    function cardResumo(label, value, subvalue) {
-      return `
-        <div class="card">
-          <span class="label">${label}</span>
-          <div class="value">${value}</div>
-          <div class="subvalue">${subvalue}</div>
-        </div>
-      `;
+    function chooseDataRef(cdi, manual) {
+      if (!manual) return cdi[cdi.length - 1].data;
+      const target = new Date(manual);
+      const elig = cdi.filter(r => new Date(r.data) <= target);
+      if (!elig.length) throw new Error('Não há CDI disponível até a data de referência informada.');
+      return elig[elig.length - 1].data;
     }
 
-    function popularFiltroEmissor(rows) {
-      const emissores = [...new Set(rows.map(r => r['Emissor filtro']).filter(Boolean))]
-        .sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
-
-      el.filtroEmissor.innerHTML = '<option value="">Todos</option>' +
-        emissores.map(e => `<option value="${escapeHtml(String(e))}">${escapeHtml(String(e))}</option>`).join('');
-
-      el.filtroIndexador.innerHTML = '<option value="">Todos</option>' +
-        ['DI', 'PREFIXADO', 'IPCA'].map(e => `<option value="${e}">${e}</option>`).join('');
-
-      el.painelFiltros.classList.remove('hidden');
+    function buildHistoricalDailyCdi(cdi, start, end) {
+      return cdi.filter(r => new Date(r.data) > new Date(start) && new Date(r.data) <= new Date(end)).map(r => r.taxa_diaria_decimal);
     }
 
-    function escapeHtml(s) {
-      return String(s)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;');
+    function buildHistoricalMonthlyIpca(ipca, start, end) {
+      return ipca.filter(r => new Date(r.data) > new Date(start) && new Date(r.data) <= new Date(end)).map(r => r.ipca_mensal_percentual / 100);
     }
 
-    function applyFilters() {
-      const busca = (el.filtroBusca.value || '').toLowerCase().trim();
-      const emissor = el.filtroEmissor.value || '';
-      const indexador = el.filtroIndexador.value || '';
-      state.sortColumn = el.filtroOrdenar.value;
-      state.sortDirection = el.filtroDirecao.value;
+    function puModelDI(unit, dailyRates, factor) {
+      let acc = unit;
+      for (const r of dailyRates) acc *= (1 + factor * r);
+      return acc;
+    }
 
-      let rows = [...state.dfResultado];
+    function puModelPrefixado(unit, start, end, annualRate) {
+      const du = busdayCount(start, end);
+      return unit * Math.pow(1 + annualRate, du / 252);
+    }
 
-      if (busca) {
-        rows = rows.filter(r => [
-          r['Nome do ativo'],
-          r['Código'],
-          r['Produto'],
-          r['Emissor filtro'],
-          r['Instituição'],
-          r['Emissor']
-        ].some(v => String(v ?? '').toLowerCase().includes(busca)));
+    function puModelIpca(unit, monthlyIpca, annualSpread) {
+      let acc = unit;
+      const spreadMonthly = Math.pow(1 + annualSpread, 1 / 12) - 1;
+      for (const m of monthlyIpca) acc *= (1 + m) * (1 + spreadMonthly);
+      return acc;
+    }
+
+    function bisect(fn, min, max, limitExpand = 20) {
+      let a = min, b = max, fa = fn(a), fb = fn(b);
+      while ((!(Number.isFinite(fa) && Number.isFinite(fb)) || fa * fb > 0) && b < limitExpand) {
+        b *= 2; fb = fn(b);
       }
-
-      if (emissor) {
-        rows = rows.filter(r => String(r['Emissor filtro'] ?? '') === emissor);
+      if (!(Number.isFinite(fa) && Number.isFinite(fb)) || fa * fb > 0) return NaN;
+      for (let i = 0; i < 300; i++) {
+        const m = (a + b) / 2; const fm = fn(m);
+        if (Math.abs(fm) < 1e-12 || Math.abs(b - a) < 1e-12) return m;
+        if (fa * fm <= 0) { b = m; fb = fm; } else { a = m; fa = fm; }
       }
-
-      if (indexador) {
-        rows = rows.filter(r => String(r['Indexador'] ?? '') === indexador);
-      }
-
-      const col = state.sortColumn;
-      const dir = state.sortDirection === 'desc' ? -1 : 1;
-      rows.sort((a, b) => compareValues(a[col], b[col]) * dir);
-
-      state.filtered = rows;
-      renderResumo(rows, rows[0]?.['Data ref CDI'] || state.dfResultado[0]?.['Data ref CDI']);
-      renderTotalizacao(rows);
-      renderTable(rows);
+      return (a + b) / 2;
     }
 
-    function compareValues(a, b) {
-      const aNum = Number(a);
-      const bNum = Number(b);
-      const aDate = new Date(a);
-      const bDate = new Date(b);
+    function estimatePrimaryRate(indexador, unit, puObs, dataEmissao, dataRef, histCdi, histIpca) {
+      if (!Number.isFinite(unit) || !Number.isFinite(puObs)) return { taxa: '-', taxaValor: NaN };
+      if (indexador === 'DI') {
+        const factor = bisect(x => puModelDI(unit, histCdi, x) - puObs, 0, 3, 20);
+        return { taxa: Number.isFinite(factor) ? `${fmtNum(factor * 100)}% CDI` : '-', taxaValor: factor };
+      }
+      if (indexador === 'PREFIXADO') {
+        const rate = bisect(x => puModelPrefixado(unit, dataEmissao, dataRef, x) - puObs, -0.5, 1.0, 4);
+        return { taxa: Number.isFinite(rate) ? `${fmtNum(rate * 100)}% a.a.` : '-', taxaValor: rate };
+      }
+      if (indexador === 'IPCA') {
+        const spread = bisect(x => puModelIpca(unit, histIpca, x) - puObs, -0.5, 1.0, 4);
+        return { taxa: Number.isFinite(spread) ? `IPCA + ${fmtNum(spread * 100)}% a.a.` : '-', taxaValor: spread };
+      }
+      return { taxa: '-', taxaValor: NaN };
+    }
 
-      if (Number.isFinite(aNum) && Number.isFinite(bNum)) return aNum - bNum;
-      if (!Number.isNaN(aDate.getTime()) && !Number.isNaN(bDate.getTime())) return aDate - bDate;
+    function addMonths(dateValue, months) {
+      const d = new Date(dateValue); const day = d.getDate();
+      d.setMonth(d.getMonth() + months); if (d.getDate() < day) d.setDate(0);
+      return d.toISOString();
+    }
+
+    function busdayCount(startDate, endDate) {
+      const start = new Date(startDate); const end = new Date(endDate);
+      if (end <= start) return 0;
+      let count = 0; const cur = new Date(start);
+      while (cur < end) {
+        const wd = cur.getDay(); if (wd !== 0 && wd !== 6) count++;
+        cur.setDate(cur.getDate() + 1);
+      }
+      return count;
+    }
+
+    function monthsBetween(startDate, endDate) {
+      const s = new Date(startDate), e = new Date(endDate);
+      return Math.max(0, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()));
+    }
+
+    function projectValue(row, horizonteMeses, cdiFuturePct, ipcaFuturePct, ignoreMaturity) {
+      const currentPU = row['Preço Atualizado CURVA'];
+      const qty = row['Quantidade Disponível'];
+      const indexador = row.Indexador;
+      const taxaValor = row.__taxaValor;
+      const dataRef = row['Data ref CDI'];
+      let futureDate = addMonths(dataRef, horizonteMeses);
+      if (!ignoreMaturity && row.Vencimento && new Date(futureDate) > new Date(row.Vencimento)) return NaN;
+      if (!Number.isFinite(currentPU) || !Number.isFinite(qty)) return NaN;
+      let futurePU = NaN;
+      if (indexador === 'DI') {
+        const daily = annualToDaily(cdiFuturePct);
+        futurePU = currentPU * Math.pow(1 + (Number.isFinite(taxaValor) ? taxaValor : 1) * daily, busdayCount(dataRef, futureDate));
+      } else if (indexador === 'PREFIXADO') {
+        const rate = Number.isFinite(taxaValor) ? taxaValor : cdiFuturePct / 100;
+        futurePU = currentPU * Math.pow(1 + rate, busdayCount(dataRef, futureDate) / 252);
+      } else if (indexador === 'IPCA') {
+        const months = monthsBetween(dataRef, futureDate);
+        const monthlyInfl = annualToMonthly(ipcaFuturePct);
+        const spreadMonthly = Math.pow(1 + (Number.isFinite(taxaValor) ? taxaValor : 0), 1 / 12) - 1;
+        futurePU = currentPU * Math.pow((1 + monthlyInfl) * (1 + spreadMonthly), months);
+      }
+      return Number.isFinite(futurePU) ? futurePU * qty : NaN;
+    }
+
+    function estimateSecondaryRate(row, compra, cdi, ipca) {
+      if (!compra) return '-';
+      const unit = inferirValorUnitario(row);
+      const indexador = row.Indexador;
+      const start = compra.data_aquisicao;
+      const end = row['Data ref CDI'];
+      const puObs = compra.valor_aquisicao;
+      if (!start || !end || !Number.isFinite(puObs)) return '-';
+      if (indexador === 'DI') {
+        const hist = buildHistoricalDailyCdi(cdi, start, end);
+        const factor = bisect(x => puModelDI(puObs, hist, x) - row['Preço Atualizado CURVA'], 0, 3, 20);
+        return Number.isFinite(factor) ? `${fmtNum(factor * 100)}% CDI` : '-';
+      }
+      if (indexador === 'PREFIXADO') {
+        const rate = bisect(x => puModelPrefixado(puObs, start, end, x) - row['Preço Atualizado CURVA'], -0.5, 1, 4);
+        return Number.isFinite(rate) ? `${fmtNum(rate * 100)}% a.a.` : '-';
+      }
+      if (indexador === 'IPCA') {
+        const hist = buildHistoricalMonthlyIpca(ipca, start, end);
+        const spread = bisect(x => puModelIpca(puObs, hist, x) - row['Preço Atualizado CURVA'], -0.5, 1, 4);
+        return Number.isFinite(spread) ? `IPCA + ${fmtNum(spread * 100)}% a.a.` : '-';
+      }
+      return '-';
+    }
+
+    function buildResults(rowsPos, cdi, ipca, comprasMap) {
+      const cdiRef = chooseDataRef(cdi, el.dataRef.value || null);
+      const cdiAnnualRef = cdi.find(r => r.data === cdiRef)?.taxa_anual_percentual;
+      const horizon = Number(el.tipoProjecao.value || 12);
+      state.horizonteMeses = horizon;
+      const ignoreMaturity = el.ignorarVencimento.checked;
+      const cdiFuture = parseNumero(el.cdiFuturo.value);
+      const ipcaFuture = parseNumero(el.ipcaFuturo.value);
+
+      const all = rowsPos.filter(r => ['DI','PREFIXADO','IPCA'].includes(r.Indexador));
+      const columns = Object.keys(all[0] || {});
+      const colProduto = chooseCol(columns, ['Produto', 'Ativo', 'Nome do Ativo', 'Código']);
+      const colEmissor = chooseCol(columns, ['Emissor', 'Instituição']);
+
+      const results = [];
+      for (const row of all) {
+        if (!row['Data de Emissão'] || !Number.isFinite(row['Quantidade Disponível']) || row['Quantidade Disponível'] <= 0) continue;
+        const unit = inferirValorUnitario(row);
+        const histCdi = buildHistoricalDailyCdi(cdi, row['Data de Emissão'], cdiRef);
+        const histIpca = ipca.length ? buildHistoricalMonthlyIpca(ipca, row['Data de Emissão'], cdiRef) : [];
+        const est = estimatePrimaryRate(row.Indexador, unit, row['Preço Atualizado CURVA'], row['Data de Emissão'], cdiRef, histCdi, histIpca);
+        const compra = comprasMap.get(String(row['Código'] ?? '').trim());
+
+        const base = {
+          ...row,
+          'Produto painel': row[colProduto] ?? row['Código'] ?? '-',
+          'Emissor painel': row[colEmissor] ?? '-',
+          'Emissão painel': row['Data de Emissão'],
+          'Vencimento painel': row.Vencimento,
+          'Data ref CDI': cdiRef,
+          'CDI ref anual': cdiAnnualRef,
+          'Taxa painel': est.taxa,
+          '__taxaValor': est.taxaValor,
+          'Valor projetado painel': projectValue({ ...row, '__taxaValor': est.taxaValor, 'Data ref CDI': cdiRef }, horizon, cdiFuture, ipcaFuture, ignoreMaturity),
+          'Data aquisição': compra?.data_aquisicao ?? null,
+          'Valor aquisição': compra?.valor_aquisicao ?? NaN,
+          'Taxa compra secundário': estimateSecondaryRate({ ...row, '__taxaValor': est.taxaValor, 'Data ref CDI': cdiRef }, compra, cdi, ipca)
+        };
+        results.push(base);
+      }
+      return { results, cdiRef };
+    }
+
+    function populateFilters(rows) {
+      const emissores = [...new Set(rows.map(r => r['Emissor painel']).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b), 'pt-BR'));
+      const indexadores = [...new Set(rows.map(r => r.Indexador).filter(Boolean))].sort();
+      el.emissorIncluir.innerHTML = '<option value="">Todos</option>' + emissores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+      el.emissorExcluir.innerHTML = '<option value="">Nenhum</option>' + emissores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+      el.indexadorFiltro.innerHTML = '<option value="">Todos</option>' + indexadores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    }
+
+    function compareValues(a,b) {
+      const an = Number(a), bn = Number(b);
+      if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+      const ad = new Date(a), bd = new Date(b);
+      if (!Number.isNaN(ad.getTime()) && !Number.isNaN(bd.getTime())) return ad - bd;
       return String(a ?? '').localeCompare(String(b ?? ''), 'pt-BR');
     }
 
-    function renderTable(rows) {
-      el.painelTabela.classList.remove('hidden');
-      el.tabelaHead.innerHTML = `<tr>${TABLE_COLUMNS.map(c => `<th data-col="${escapeHtml(c)}">${escapeHtml(c)}</th>`).join('')}</tr>`;
-      el.tabelaBody.innerHTML = rows.map(r => `
-        <tr>
-          ${TABLE_COLUMNS.map(c => renderCell(c, r[c])).join('')}
-        </tr>
-      `).join('');
+    function applyFilters() {
+      let rows = [...state.results];
+      const busca = (el.busca.value || '').toLowerCase().trim();
+      const idx = el.indexadorFiltro.value || '';
+      const inc = el.emissorIncluir.value || '';
+      const exc = el.emissorExcluir.value || '';
+      const ord = el.ordenarPor.value;
+      const dir = el.direcaoOrdenacao.value === 'desc' ? -1 : 1;
 
-      el.tabelaHead.querySelectorAll('th').forEach(th => {
+      if (busca) {
+        rows = rows.filter(r => [r['Produto painel'], r['Código'], r['Emissor painel'], r['Produto']].some(v => String(v ?? '').toLowerCase().includes(busca)));
+      }
+      if (idx) rows = rows.filter(r => r.Indexador === idx);
+      if (inc) rows = rows.filter(r => String(r['Emissor painel'] ?? '') === inc);
+      if (exc) rows = rows.filter(r => String(r['Emissor painel'] ?? '') !== exc);
+
+      rows.sort((a,b) => compareValues(a[ord], b[ord]) * dir);
+      state.filtered = rows;
+      renderSummary(rows);
+      renderTable(rows);
+    }
+
+    function metric(label, value, sub) {
+      return `<div class="card"><div class="metric-label">${label}</div><div class="metric-value">${value}</div><div class="metric-sub">${sub}</div></div>`;
+    }
+
+    function renderSummary(rows) {
+      const sumCurva = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor Atualizado CURVA']) ? r['Valor Atualizado CURVA'] : 0), 0);
+      const sumProj = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor projetado painel']) ? r['Valor projetado painel'] : 0), 0);
+      const sumAquis = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor aquisição']) ? r['Valor aquisição'] : 0), 0);
+      el.summaryGrid.innerHTML = [
+        metric('Ativos no filtro', String(rows.length), 'Quantidade exibida no painel'),
+        metric('Valor na curva', `R$ ${fmtNum(sumCurva)}`, 'Soma do recorte filtrado'),
+        metric(`Valor projetado ${state.horizonteMeses}m`, `R$ ${fmtNum(sumProj)}`, 'Usando as taxas futuras informadas'),
+        metric('Valor de aquisição conhecido', `R$ ${fmtNum(sumAquis)}`, 'Com base em compras_secundario.csv')
+      ].join('');
+      el.summarySection.classList.remove('hidden');
+    }
+
+    function renderTable(rows) {
+      el.tableSection.classList.remove('hidden');
+      el.thead.innerHTML = `<tr>${colsTabela.map(c => `<th data-col="${esc(c)}">${esc(c)}</th>`).join('')}</tr>`;
+      el.tbody.innerHTML = rows.map(r => `<tr>${colsTabela.map(c => renderCell(c, r[c])).join('')}</tr>`).join('');
+      el.thead.querySelectorAll('th').forEach(th => {
         th.addEventListener('click', () => {
-          const col = th.dataset.col;
-          if (state.sortColumn === col) {
-            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-          } else {
-            state.sortColumn = col;
-            state.sortDirection = 'asc';
-          }
-          el.filtroOrdenar.value = state.sortColumn;
-          el.filtroDirecao.value = state.sortDirection;
+          el.ordenarPor.value = th.dataset.col;
+          if (el.direcaoOrdenacao.value === 'asc') el.direcaoOrdenacao.value = 'desc'; else el.direcaoOrdenacao.value = 'asc';
           applyFilters();
         });
       });
     }
 
-    function renderCell(column, value) {
-      if (numericColumns.has(column)) {
-        return `<td class="right">${Number.isFinite(value) ? brNumber(value) : '-'}</td>`;
+    function renderCell(col, value) {
+      if (numericCols.has(col)) return `<td class="right">${Number.isFinite(value) ? fmtNum(value) : '-'}</td>`;
+      if (String(col).includes('painel') && (String(col).includes('Emissão') || String(col).includes('Vencimento')) || col === 'Data aquisição') {
+        return `<td>${fmtDate(value)}</td>`;
       }
-      if (String(column).toLowerCase().includes('data') || column === 'Vencimento') {
-        return `<td>${brDate(value)}</td>`;
-      }
-      return `<td>${escapeHtml(value ?? '-')}</td>`;
+      return `<td>${esc(value)}</td>`;
     }
 
-    function exportarExcel() {
-  const wb = XLSX.utils.book_new();
-  const ws1 = XLSX.utils.json_to_sheet(state.filtered.length ? state.filtered : state.dfResultado);
-  const ws2 = XLSX.utils.json_to_sheet(state.dfProcessaveis);
-  const ws3 = XLSX.utils.json_to_sheet(state.dfCdi);
-  XLSX.utils.book_append_sheet(wb, ws1, 'Estimativa');
-  XLSX.utils.book_append_sheet(wb, ws2, 'Ativos_Processaveis');
-  XLSX.utils.book_append_sheet(wb, ws3, 'Serie_CDI');
-  if (state.dfIpca && state.dfIpca.length) {
-    const ws4 = XLSX.utils.json_to_sheet(state.dfIpca);
-    XLSX.utils.book_append_sheet(wb, ws4, 'Serie_IPCA');
-  }
-  XLSX.writeFile(wb, 'estimativa_curva_multicenario.xlsx');
-}
+    function exportExcel() {
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.filtered.length ? state.filtered : state.results), 'Painel');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.historicoCdi), 'Serie_CDI');
+      if (state.historicoIpca.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.historicoIpca), 'Serie_IPCA');
+      XLSX.writeFile(wb, 'painel_renda_fixa_leve.xlsx');
+    }
 
-    function limparTudo() {
-      state.dfResultado = [];
-      state.dfProcessaveis = [];
-      state.dfCdi = [];
-      state.filtered = [];
+    function resetUI() {
+      state.results = []; state.filtered = []; state.historicoCdi = []; state.historicoIpca = []; state.comprasSecundario = [];
       el.arquivoPosicao.value = '';
-      el.filtroBusca.value = '';
-      el.filtroEmissor.innerHTML = '<option value="">Todos</option>';
-      el.filtroIndexador.innerHTML = '<option value="">Todos</option>';
-      el.painelResumo.classList.add('hidden');
-      el.painelFiltros.classList.add('hidden');
-      el.painelTotalizacao.classList.add('hidden');
-      el.painelTabela.classList.add('hidden');
-      el.tabelaHead.innerHTML = '';
-      el.tabelaBody.innerHTML = '';
+      el.busca.value = '';
+      el.indexadorFiltro.innerHTML = '<option value="">Todos</option>';
+      el.emissorIncluir.innerHTML = '<option value="">Todos</option>';
+      el.emissorExcluir.innerHTML = '<option value="">Nenhum</option>';
+      el.summarySection.classList.add('hidden');
+      el.filtersSection.classList.add('hidden');
+      el.tableSection.classList.add('hidden');
+      el.thead.innerHTML = ''; el.tbody.innerHTML = '';
       el.btnExportar.disabled = true;
       setStatus('');
     }
 
     el.btnProcessar.addEventListener('click', async () => {
       try {
-        if (!el.arquivoPosicao.files[0]) {
-          throw new Error('Selecione a planilha de posição em Excel.');
-        }
-
+        if (!el.arquivoPosicao.files[0]) throw new Error('Selecione a planilha de posição.');
+        setStatus('Lendo planilha e séries do repositório...');
         el.btnProcessar.disabled = true;
-        setStatus('Lendo a planilha, carregando serie_cdi.csv e tentando carregar serie_ipca.csv do repositório...');
 
-        const { rows: posRows, actualSheet } = await readExcel(
-          el.arquivoPosicao.files[0],
-          el.nomeAba.value.trim() || 'Renda Fixa'
-        );
-        const cdiRows = await fetchCsvFromRepo(state.cdiCsvPath);
+        const { rows: posRows, actualSheet } = await readExcel(el.arquivoPosicao.files[0], el.nomeAba.value.trim() || 'Renda Fixa');
+        const cdiRaw = await fetchOptionalCsv(state.caminhos.cdi);
+        if (!cdiRaw.length) throw new Error('Não foi possível carregar serie_cdi.csv no repositório.');
+        const ipcaRaw = el.usarCsvIpca.checked ? await fetchOptionalCsv(state.caminhos.ipca) : [];
+        const comprasRaw = await fetchOptionalCsv(state.caminhos.compras);
 
-        let ipcaRows = [];
-        let ipcaStatus = 'não carregado';
-        try {
-          ipcaRows = await fetchCsvFromRepo(state.ipcaCsvPath);
-          ipcaStatus = 'carregado do repositório';
-        } catch (e) {
-          console.warn('serie_ipca.csv não carregado:', e);
-          ipcaRows = [];
-          ipcaStatus = 'indisponível; usando fallback manual quando necessário';
-        }
+        const pos = prepararPosicao(posRows);
+        const cdi = prepararCdi(cdiRaw);
+        const ipca = prepararIpca(ipcaRaw);
+        const comprasMap = prepararCompras(comprasRaw);
 
-        const dfPosicao = prepararDfPosicao(posRows);
-        const dfCdi = prepararDfCdi(cdiRows);
-        const dfIpca = prepararDfIpca(ipcaRows);
-        const dataRefManual = el.dataRef.value || null;
+        if (!cdi.length) throw new Error('O CSV do CDI não trouxe dados válidos.');
 
-        const { resultado, dfProcessaveis, cdiFiltrado, dataRefEfetiva, scenario } = processar(dfPosicao, dfCdi, dfIpca, dataRefManual);
+        const { results, cdiRef } = buildResults(pos, cdi, ipca, comprasMap);
+        state.results = results;
+        state.historicoCdi = cdi;
+        state.historicoIpca = ipca;
+        state.comprasSecundario = [...comprasMap.values()];
 
-        state.dfResultado = resultado;
-        state.dfProcessaveis = dfProcessaveis;
-        state.dfCdi = cdiFiltrado;
-        state.dfIpca = dfIpca;
-        state.sortColumn = 'Nome do ativo';
-        state.sortDirection = 'asc';
-
-        popularFiltroEmissor(resultado);
+        populateFilters(results);
+        el.filtersSection.classList.remove('hidden');
         applyFilters();
         el.btnExportar.disabled = false;
 
         setStatus(
           `Processamento concluído. Aba usada: ${actualSheet}. ` +
-          `Ativos DI, PREFIXADO e IPCA encontrados na planilha: ${dfProcessaveis.length}. ` +
-          `Ativos exibidos após processamento: ${resultado.length}. ` +
-          `Série CDI carregada de ${state.cdiCsvPath}: ${cdiFiltrado.length} registros. ` +
-          `IPCA: ${ipcaStatus}. ` +
-          `Última data disponível usada como referência: ${brDate(dataRefEfetiva)}. ` +
-          `Projeção ${scenario.respeitarVencimento ? 'respeitando' : 'ignorando'} o vencimento.`
+          `Ativos DI/PREFIXADO/IPCA encontrados: ${results.length}. ` +
+          `Data de referência usada: ${fmtDate(cdiRef)}. ` +
+          `IPCA histórico carregado: ${ipca.length ? 'sim' : 'não'}. ` +
+          `Compras secundárias carregadas: ${comprasMap.size}.`
         );
       } catch (err) {
         console.error(err);
@@ -1445,13 +775,14 @@ function renderTotalizacao(rows) {
       }
     });
 
-    el.btnExportar.addEventListener('click', exportarExcel);
-    el.btnLimpar.addEventListener('click', limparTudo);
-    el.filtroBusca.addEventListener('input', applyFilters);
-    el.filtroEmissor.addEventListener('change', applyFilters);
-    el.filtroIndexador.addEventListener('change', applyFilters);
-    el.filtroOrdenar.addEventListener('change', applyFilters);
-    el.filtroDirecao.addEventListener('change', applyFilters);
+    el.btnExportar.addEventListener('click', exportExcel);
+    el.btnLimpar.addEventListener('click', resetUI);
+    el.busca.addEventListener('input', applyFilters);
+    el.indexadorFiltro.addEventListener('change', applyFilters);
+    el.emissorIncluir.addEventListener('change', applyFilters);
+    el.emissorExcluir.addEventListener('change', applyFilters);
+    el.ordenarPor.addEventListener('change', applyFilters);
+    el.direcaoOrdenacao.addEventListener('change', applyFilters);
   </script>
 </body>
 </html>
