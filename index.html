@@ -4,16 +4,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel Leve - Curva, Secundário e Cronograma</title>
+  <title>Painel leve - curva, secundário e vencimentos</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root{
       --bg:#0b1020; --panel:#121a31; --panel2:#182347; --text:#e8eefc; --muted:#a8b3d1;
-      --accent:#6ea8fe; --border:#2a365c; --ok:#7ce7c3; --warn:#ffd166;
+      --accent:#6ea8fe; --border:#2a365c; --ok:#7ce7c3; --warn:#ffd166; --danger:#ff9a9a;
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(180deg,#0b1020 0%,#10183a 100%);color:var(--text)}
-    .container{max-width:1440px;margin:0 auto;padding:24px}
+    .container{max-width:1500px;margin:0 auto;padding:24px}
     .card{background:rgba(18,26,49,.96);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.22);margin-bottom:16px}
     h1,h2,h3,p{margin-top:0}
     .hero{padding:26px;border-radius:26px;background:linear-gradient(135deg,#152248 0%,#0e1734 100%)}
@@ -25,24 +25,27 @@
     input,select{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:11px 12px;outline:none}
     select[multiple]{min-height:120px}
     input[type=file]::file-selector-button{margin-right:12px;border:0;background:var(--accent);color:white;padding:8px 12px;border-radius:10px;cursor:pointer}
-    input[disabled]{opacity:.8;cursor:not-allowed}
+    input[disabled]{opacity:.85;cursor:not-allowed}
     .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
     button{border:0;background:var(--accent);color:#fff;padding:12px 18px;border-radius:12px;cursor:pointer;font-weight:600}
     button.secondary{background:#24345f}
     .status{margin-top:12px;color:var(--muted);white-space:pre-wrap;min-height:20px}
-    .summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+    .summary{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
     .summary .card{margin:0}
     .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:8px}
-    .value{font-size:26px;font-weight:700}
+    .value{font-size:24px;font-weight:700}
     .sub{font-size:12px;color:var(--muted);margin-top:6px}
     .split{display:grid;grid-template-columns:2fr 1fr;gap:16px}
     .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:18px}
-    table{width:100%;border-collapse:collapse;min-width:1200px;background:rgba(18,26,49,.96)}
+    table{width:100%;border-collapse:collapse;min-width:1100px;background:rgba(18,26,49,.96)}
     th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
     th{position:sticky;top:0;background:#0f1733;color:#cfe0ff;cursor:pointer}
     .right{text-align:right}
     .hidden{display:none!important}
     .foot{font-size:12px;color:var(--muted);margin-top:10px}
+    .schedule-split{display:grid;grid-template-columns:1fr;gap:12px}
+    .small-table table{min-width:100%}
+    .tag{display:inline-block;padding:3px 8px;border-radius:999px;background:#142140;border:1px solid var(--border);font-size:12px;color:var(--muted)}
     @media(max-width:1200px){.controls,.summary,.split{grid-template-columns:1fr 1fr}}
     @media(max-width:800px){.controls,.summary,.split{grid-template-columns:1fr}}
   </style>
@@ -52,16 +55,16 @@
   <section class="card hero">
     <h1>Painel leve - curva, secundário e cronograma de vencimentos</h1>
     <p class="muted">
-      Envie a planilha de posição. O painel lê automaticamente <code>serie_cdi.csv</code>, tenta ler
-      <code>serie_ipca.csv</code> e usa <code>compras_secundario_atualizado.csv</code> (ou <code>compras_secundario.csv</code>)
-      para custo de aquisição e taxa de compra no secundário. A data de referência do CDI é opcional:
-      em branco, usa a última data disponível no CSV.
+      Envie a planilha de posição. O painel usa automaticamente a data atual do computador como referência e seleciona
+      a última data disponível nos arquivos do repositório até hoje. Ele lê <code>serie_cdi.csv</code>, tenta ler
+      <code>serie_ipca.csv</code> e procura primeiro <code>compras_secundario_por_codigo_atualizado_posicao_detalhada.csv</code>
+      para custo de aquisição e taxa da compra no secundário.
     </p>
     <div>
-      <span class="pill">Filtros por inclusão e exclusão múltipla</span>
-      <span class="pill">Totais recalculados após filtrar</span>
-      <span class="pill">Cronograma mensal de vencimentos</span>
-      <span class="pill">Projeção 12m com e sem vencimento</span>
+      <span class="pill">Sem data de referência manual</span>
+      <span class="pill">Cronograma mensal com lista de ativos</span>
+      <span class="pill">Taxa do secundário baseada no PU de aquisição</span>
+      <span class="pill">Projeção 12m com e sem considerar vencimento</span>
     </div>
   </section>
 
@@ -77,20 +80,20 @@
         <input id="nomeAba" type="text" value="Renda Fixa" />
       </div>
       <div class="field">
-        <label for="dataRef">Data de referência do CDI/IPCA</label>
-        <input id="dataRef" type="date" />
-      </div>
-      <div class="field">
-        <label>Arquivos do repositório</label>
-        <input id="repoFiles" type="text" value="./serie_cdi.csv | ./serie_ipca.csv | ./compras_secundario_atualizado.csv" disabled />
-      </div>
-      <div class="field">
         <label for="cdiFuturo">CDI/SELIC anual futura para projeção (%)</label>
         <input id="cdiFuturo" type="number" step="0.01" value="14.25" />
       </div>
       <div class="field">
         <label for="ipcaFuturo">IPCA anual médio para projeção (%)</label>
         <input id="ipcaFuturo" type="number" step="0.01" value="4.5" />
+      </div>
+      <div class="field">
+        <label>Arquivos do repositório</label>
+        <input id="repoFiles" type="text" value="./serie_cdi.csv | ./serie_ipca.csv | ./compras_secundario_por_codigo_atualizado_posicao_detalhada.csv" disabled />
+      </div>
+      <div class="field">
+        <label>Data do computador</label>
+        <input id="todayDisplay" type="text" disabled />
       </div>
     </div>
     <div class="actions">
@@ -143,11 +146,22 @@
     </div>
     <div class="card">
       <h2>Cronograma de vencimento por mês</h2>
-      <div class="table-wrap">
-        <table id="tabelaCronograma">
-          <thead></thead>
-          <tbody></tbody>
-        </table>
+      <div class="schedule-split">
+        <div class="table-wrap small-table">
+          <table id="tabelaCronograma">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div>
+          <h3 id="cronogramaTitulo">Ativos do mês selecionado</h3>
+          <div class="table-wrap small-table">
+            <table id="tabelaCronogramaAtivos">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -159,77 +173,132 @@ const state = {
   filtered: [],
   cdi: [],
   ipca: [],
-  compras: [],
+  comprasByCode: new Map(),
   sortCol: 'Vencimento painel',
   sortDir: 'asc',
+  selectedMonth: null,
+  todayYMD: null,
+  refCdiYMD: null,
+  refIpcaYMD: null,
 };
+
+const MAIN_COLUMNS = [
+  'Produto painel','Emissor painel','Código','Indexador','Emissão painel','Vencimento painel',
+  'Taxa painel','Valor Atualizado CURVA','Data aquisição','Custo aquisição',
+  'PU aquisição','Taxa compra secundário','Valor projetado 12m com vencimento','Valor projetado 12m sem vencimento'
+];
+const NUMERIC_COLUMNS = new Set([
+  'Valor Atualizado CURVA','Custo aquisição','PU aquisição','Valor projetado 12m com vencimento','Valor projetado 12m sem vencimento'
+]);
 
 const el = {
   arquivoPosicao: document.getElementById('arquivoPosicao'),
   nomeAba: document.getElementById('nomeAba'),
-  dataRef: document.getElementById('dataRef'),
   cdiFuturo: document.getElementById('cdiFuturo'),
   ipcaFuturo: document.getElementById('ipcaFuturo'),
+  todayDisplay: document.getElementById('todayDisplay'),
   btnProcessar: document.getElementById('btnProcessar'),
   btnExportar: document.getElementById('btnExportar'),
   btnLimpar: document.getElementById('btnLimpar'),
   status: document.getElementById('status'),
   sumario: document.getElementById('sumario'),
   filtros: document.getElementById('filtros'),
+  painelAnalitico: document.getElementById('painelAnalitico'),
   filtroBusca: document.getElementById('filtroBusca'),
   filtroIndexador: document.getElementById('filtroIndexador'),
   filtroEmissorIncluir: document.getElementById('filtroEmissorIncluir'),
   filtroEmissorExcluir: document.getElementById('filtroEmissorExcluir'),
-  painelAnalitico: document.getElementById('painelAnalitico'),
   tabelaMainHead: document.querySelector('#tabelaMain thead'),
   tabelaMainBody: document.querySelector('#tabelaMain tbody'),
-  tabelaCronHead: document.querySelector('#tabelaCronograma thead'),
-  tabelaCronBody: document.querySelector('#tabelaCronograma tbody'),
+  tabelaCronogramaHead: document.querySelector('#tabelaCronograma thead'),
+  tabelaCronogramaBody: document.querySelector('#tabelaCronograma tbody'),
+  cronogramaTitulo: document.getElementById('cronogramaTitulo'),
+  tabelaCronogramaAtivosHead: document.querySelector('#tabelaCronogramaAtivos thead'),
+  tabelaCronogramaAtivosBody: document.querySelector('#tabelaCronogramaAtivos tbody'),
 };
 
-const MAIN_COLUMNS = [
-  'Produto painel','Emissor painel','Código','Indexador','Emissão painel','Vencimento painel',
-  'Taxa painel','Valor Atualizado CURVA','Data aquisição','Custo aquisição',
-  'Taxa compra secundário','Valor projetado com vencimento','Valor projetado sem vencimento'
-];
-const numericCols = new Set(['Valor Atualizado CURVA','Custo aquisição','Valor projetado com vencimento','Valor projetado sem vencimento']);
-
-function setStatus(t){ el.status.textContent = t || ''; }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function localTodayYMD(){
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+function ymdToDateUTC(ymd){
+  if(!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const [y,m,d] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m-1, d));
+}
+function dateUTCToYMD(dateObj){
+  if(!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return null;
+  return `${dateObj.getUTCFullYear()}-${pad2(dateObj.getUTCMonth()+1)}-${pad2(dateObj.getUTCDate())}`;
+}
+function fmtDate(ymd){
+  if(!ymd) return '-';
+  const parts = String(ymd).split('-');
+  if(parts.length !== 3) return '-';
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
 function fmtNum(v, d=2){ return Number.isFinite(v) ? Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}) : '-'; }
 function fmtCur(v){ return Number.isFinite(v) ? `R$ ${fmtNum(v,2)}` : '-'; }
-function fmtPct(v){ return Number.isFinite(v) ? `${fmtNum(v,2)}%` : '-'; }
-function fmtDate(v){ if(!v) return '-'; const d = new Date(v); return Number.isNaN(d.getTime()) ? '-' : d.toLocaleDateString('pt-BR'); }
+function fmtPct(v, d=2){ return Number.isFinite(v) ? `${fmtNum(v,d)}%` : '-'; }
 function parseNum(v){
   if(v === null || v === undefined || v === '') return NaN;
   if(typeof v === 'number') return v;
-  let s = String(v).trim();
+  let s = String(v).trim().replace(/\s+/g,' ');
   if(['','-','nan','NaN','None','NaT'].includes(s)) return NaN;
-  if(s.includes('R$')) s = s.replace('R$','').trim();
+  s = s.replace('R$','').trim();
   if(s.includes('.') && s.includes(',')) s = s.replace(/\./g,'').replace(',', '.');
   else if(s.includes(',')) s = s.replace(',', '.');
   const n = Number(s);
   return Number.isFinite(n) ? n : NaN;
 }
-function excelDateToISO(value){
+function setStatus(text){ el.status.textContent = text || ''; }
+function compareYMD(a,b){ return String(a||'').localeCompare(String(b||'')); }
+function yearMonth(ymd){ return String(ymd||'').slice(0,7); }
+function yearMonthLabel(ym){ if(!ym || ym.length<7) return '-'; const [y,m]=ym.split('-'); return `${m}/${y}`; }
+
+function parseDateAny(value){
   if(value === null || value === undefined || value === '') return null;
-  if(value instanceof Date && !Number.isNaN(value.getTime())){
-    return new Date(Date.UTC(value.getFullYear(),value.getMonth(),value.getDate())).toISOString();
-  }
+  if(value instanceof Date && !Number.isNaN(value.getTime())) return dateUTCToYMD(new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())));
   if(typeof value === 'number'){
     const utcDays = Math.floor(value - 25569);
     const utcValue = utcDays * 86400;
-    return new Date(utcValue * 1000).toISOString();
+    return dateUTCToYMD(new Date(utcValue * 1000));
   }
-  if(typeof value === 'string'){
-    const s = value.trim();
-    let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if(m){ const [,dd,mm,yyyy]=m; return new Date(Date.UTC(+yyyy,+mm-1,+dd)).toISOString(); }
-    m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if(m){ const [,yyyy,mm,dd]=m; return new Date(Date.UTC(+yyyy,+mm-1,+dd)).toISOString(); }
-    const d = new Date(s); if(!Number.isNaN(d.getTime())) return d.toISOString();
-  }
+  const s = String(value).trim();
+  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(m){ const [,dd,mm,yyyy]=m; return `${yyyy}-${mm}-${dd}`; }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m){ const [,yyyy,mm,dd]=m; return `${yyyy}-${mm}-${dd}`; }
+  const d = new Date(s);
+  if(!Number.isNaN(d.getTime())) return dateUTCToYMD(d);
   return null;
 }
+
+function busdayCount(startYMD, endYMD){
+  const start = ymdToDateUTC(startYMD);
+  const end = ymdToDateUTC(endYMD);
+  if(!start || !end || end <= start) return 0;
+  let count = 0;
+  const cur = new Date(start.getTime());
+  while(cur < end){
+    const day = cur.getUTCDay();
+    if(day !== 0 && day !== 6) count += 1;
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return count;
+}
+function addMonthsYMD(ymd, months){
+  const d = ymdToDateUTC(ymd);
+  if(!d) return null;
+  const day = d.getUTCDate();
+  const out = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1));
+  const lastDay = new Date(Date.UTC(out.getUTCFullYear(), out.getUTCMonth()+1, 0)).getUTCDate();
+  out.setUTCDate(Math.min(day, lastDay));
+  return dateUTCToYMD(out);
+}
+function minYMD(a,b){ return compareYMD(a,b) <= 0 ? a : b; }
+function selectedValues(selectEl){ return Array.from(selectEl.selectedOptions || []).map(o => o.value).filter(Boolean); }
+
 function splitCsvLine(line, delimiter){
   const out=[]; let cur=''; let inQuotes=false;
   for(let i=0;i<line.length;i++){
@@ -248,7 +317,7 @@ function parseCSV(text){
   const delimiter = lines[0].includes(';') ? ';' : ',';
   const headers = splitCsvLine(lines[0], delimiter).map(h=>h.trim());
   return lines.slice(1).map(line=>{
-    const parts=splitCsvLine(line, delimiter); const obj={};
+    const parts = splitCsvLine(line, delimiter); const obj={};
     headers.forEach((h,i)=>obj[h]=(parts[i] ?? '').trim());
     return obj;
   });
@@ -270,438 +339,550 @@ async function readExcel(file, sheetName){
   const rows = XLSX.utils.sheet_to_json(ws, {defval:null, raw:true});
   return {rows, actualSheet};
 }
-function bizDays(startIso, endIso){
-  const s=new Date(startIso), e=new Date(endIso);
-  if(e<=s) return 0;
-  let c=0, d=new Date(s);
-  while(d<e){ const wd=d.getDay(); if(wd!==0 && wd!==6) c++; d.setDate(d.getDate()+1); }
-  return c;
+
+function normalizeIndexador(v){
+  const s = String(v || '').toUpperCase();
+  if(s.includes('PREFIX')) return 'PREFIXADO';
+  if(s.includes('IPCA')) return 'IPCA';
+  if(s.includes('DI')) return 'DI';
+  return s.trim();
 }
-function addMonths(iso, months){
-  const d=new Date(iso); const day=d.getDate();
-  d.setMonth(d.getMonth()+months); if(d.getDate()<day) d.setDate(0);
-  return d.toISOString();
+function cleanProductRateText(text){
+  return String(text || '').replace(/\s+/g,' ').trim();
 }
-function formatMonthKey(iso){ const d=new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
-function mean(vals){ const x=vals.filter(Number.isFinite); return x.length ? x.reduce((a,b)=>a+b,0)/x.length : NaN; }
-function product(arr){ return arr.reduce((a,b)=>a*b,1); }
-function clamp(x,a,b){ return Math.max(a, Math.min(b,x)); }
-function inferUnitBase(row){
-  const price = row['Preço Atualizado CURVA'];
-  const qty = row['Quantidade Disponível'];
-  const total = row['Valor Atualizado CURVA'];
-  const ratio = (Number.isFinite(total)&&Number.isFinite(qty)&&qty>0) ? total/qty : NaN;
-  const candidates = [0.01,1,100,500,1000];
-  let best = candidates[0], bestScore=1e18;
-  for(const c of candidates){
-    let score = 0;
-    if(Number.isFinite(price)) score += Math.abs(price-c)/Math.max(c,0.01)*2.5;
-    if(Number.isFinite(ratio)) score += Math.abs(ratio-c)/Math.max(c,0.01);
-    if(c===500 && Number.isFinite(price) && price>450 && price<550) score -= 0.6;
-    if(c===1000 && Number.isFinite(price) && price>900 && price<1200) score -= 0.3;
-    if(score<bestScore){ best=c; bestScore=score; }
+function parsePercentFromString(text){
+  const m = String(text || '').match(/(\d+(?:[.,]\d+)?)\s*%/);
+  return m ? parseNum(m[1]) : NaN;
+}
+function parseIndexadorRate(row){
+  const product = cleanProductRateText(row['Produto'] || row['Produto painel'] || '');
+  const idx = normalizeIndexador(row['Indexador']);
+  if(idx === 'DI'){
+    return {type:'DI', value: parsePercentFromString(product)};
   }
-  return best;
+  if(idx === 'PREFIXADO'){
+    return {type:'PREFIXADO', value: parsePercentFromString(product)};
+  }
+  if(idx === 'IPCA'){
+    const m = product.match(/IPCA\s*\+\s*(\d+(?:[.,]\d+)?)/i);
+    return {type:'IPCA', value: m ? parseNum(m[1]) : NaN};
+  }
+  return {type:idx || '', value: NaN};
 }
-function chooseDataRef(series, manual){
-  if(!series.length) return null;
-  if(!manual) return series[series.length-1].data;
-  const t = new Date(manual);
-  const elig = series.filter(r => new Date(r.data) <= t);
-  return elig.length ? elig[elig.length-1].data : null;
+function inferUnitBase(row){
+  const price = parseNum(row['Preço Atualizado CURVA']);
+  const value = parseNum(row['Valor Atualizado CURVA']);
+  const qty = parseNum(row['Quantidade Disponível']);
+  const candidates = [1,100,500,1000];
+  if(Number.isFinite(price) && price > 0){
+    let best = candidates[0];
+    let bestRel = Infinity;
+    for(const c of candidates){
+      const rel = Math.abs(price - c) / c;
+      if(rel < bestRel){ bestRel = rel; best = c; }
+    }
+    if(bestRel < 0.35) return best;
+  }
+  if(Number.isFinite(value) && Number.isFinite(qty) && qty > 0 && qty < 1e9){
+    const ratio = value / qty;
+    return candidates.reduce((best, curr)=>Math.abs(curr - ratio) < Math.abs(best - ratio) ? curr : best, candidates[0]);
+  }
+  return Number.isFinite(price) && price > 0 ? price : 1000;
 }
-function cdiDailyFromAnnual(a){ return Math.pow(1 + a/100, 1/252) - 1; }
-function getCdiHist(startIso, endIso){
-  return state.cdi.filter(r => new Date(r.data) > new Date(startIso) && new Date(r.data) <= new Date(endIso)).map(r=>r.taxa_diaria_decimal);
+
+function prepareCdi(rows){
+  return rows.map(r=>{
+    const data = parseDateAny(r.data || r['Data']);
+    let anual = parseNum(r.taxa_anual_percentual ?? r['taxa_anual_percentual']);
+    let diaria = parseNum(r.taxa_diaria_decimal ?? r['taxa_diaria_decimal']);
+    if(!Number.isFinite(diaria) && Number.isFinite(anual)) diaria = Math.pow(1 + anual/100, 1/252) - 1;
+    return {data, taxa_anual_percentual: anual, taxa_diaria_decimal: diaria};
+  }).filter(r=>r.data && Number.isFinite(r.taxa_diaria_decimal))
+    .sort((a,b)=>compareYMD(a.data,b.data))
+    .filter((row, idx, arr)=>idx === arr.findLastIndex(x => x.data === row.data));
 }
-function parseProductRateText(prod){
-  const p = String(prod || '').toUpperCase();
-  let m = p.match(/(\d+[.,]?\d*)\s*%\s*A\.?A\.?/);
-  if(m) return {type:'PREFIXADO', value: parseNum(m[1])};
-  m = p.match(/IPCA\s*\+\s*(\d+[.,]?\d*)/);
-  if(m) return {type:'IPCA', value: parseNum(m[1])};
-  m = p.match(/(\d+[.,]?\d*)\s*%/);
-  if(m) return {type:'DI', value: parseNum(m[1])};
-  return null;
+function prepareIpca(rows){
+  return rows.map(r=>{
+    const data = parseDateAny(r.data || r['Data']);
+    const month = data ? yearMonth(data) : null;
+    let mensal = parseNum(r.ipca_mensal_percentual ?? r.ipca_percentual ?? r.ipca ?? r.valor ?? r.percentual);
+    return {data, month, ipca_mensal_percentual: mensal};
+  }).filter(r=>r.data && r.month && Number.isFinite(r.ipca_mensal_percentual))
+    .sort((a,b)=>compareYMD(a.data,b.data))
+    .filter((row, idx, arr)=>idx === arr.findLastIndex(x => x.month === row.month));
 }
-function solveBisection(fn, a, b, maxIter=220, tol=1e-12){
-  let fa=fn(a), fb=fn(b);
-  while(Number.isFinite(fa)&&Number.isFinite(fb)&&fa*fb>0&&b<50){ b*=2; fb=fn(b); }
-  if(!Number.isFinite(fa)||!Number.isFinite(fb)||fa*fb>0) return NaN;
-  for(let i=0;i<maxIter;i++){
-    const m=(a+b)/2, fm=fn(m);
-    if(Math.abs(fm)<tol || Math.abs(b-a)<tol) return m;
-    if(fa*fm<=0){ b=m; fb=fm; } else { a=m; fa=fm; }
+function chooseRefDate(series, todayYMD){
+  const elig = series.filter(r => compareYMD(r.data, todayYMD) <= 0);
+  if(elig.length) return elig[elig.length - 1].data;
+  return series.length ? series[series.length - 1].data : null;
+}
+
+function aggregatePurchases(rawRows){
+  const looksConsolidated = rawRows.length && ('custo_aquisicao_total' in rawRows[0] || 'valor_aquisicao_total' in rawRows[0]);
+  const map = new Map();
+  if(looksConsolidated){
+    for(const r of rawRows){
+      const codigo = String(r.codigo || r.Código || '').trim();
+      if(!codigo) continue;
+      const dataUlt = parseDateAny(r.data_ultima_aquisicao || r['Data última aquisição'] || r.data_aquisicao);
+      const dataPrim = parseDateAny(r.data_primeira_aquisicao || r['Data primeira aquisição'] || r.data_aquisicao);
+      const custo = parseNum(r.custo_aquisicao_total);
+      const valor = parseNum(r.valor_aquisicao_total);
+      const record = {
+        codigo,
+        data_primeira_aquisicao: dataPrim || dataUlt,
+        data_ultima_aquisicao: dataUlt || dataPrim,
+        custo_aquisicao_total: Number.isFinite(custo) ? custo : valor,
+        valor_aquisicao_total: Number.isFinite(valor) ? valor : custo,
+        lotes: parseNum(r.lotes) || 1,
+        fonte: r.fontes || r.fonte || '',
+        confianca: r.confiancas || r.confianca || '',
+      };
+      if(record.data_ultima_aquisicao && Number.isFinite(record.custo_aquisicao_total)){
+        map.set(codigo, record);
+      }
+    }
+    return map;
+  }
+  for(const r of rawRows){
+    const codigo = String(r.codigo || r.Código || '').trim();
+    const data = parseDateAny(r.data_aquisicao || r['Data de aquisição']);
+    const custo = parseNum(r.custo_aquisicao);
+    const valor = parseNum(r.valor_aquisicao);
+    if(!codigo || !data || !Number.isFinite(custo || valor)) continue;
+    const current = map.get(codigo) || {
+      codigo, data_primeira_aquisicao:data, data_ultima_aquisicao:data,
+      custo_aquisicao_total:0, valor_aquisicao_total:0, lotes:0, fonte:'', confianca:''
+    };
+    current.data_primeira_aquisicao = compareYMD(data, current.data_primeira_aquisicao) < 0 ? data : current.data_primeira_aquisicao;
+    current.data_ultima_aquisicao = compareYMD(data, current.data_ultima_aquisicao) > 0 ? data : current.data_ultima_aquisicao;
+    current.custo_aquisicao_total += Number.isFinite(custo) ? custo : (Number.isFinite(valor) ? valor : 0);
+    current.valor_aquisicao_total += Number.isFinite(valor) ? valor : (Number.isFinite(custo) ? custo : 0);
+    current.lotes += 1;
+    map.set(codigo, current);
+  }
+  return map;
+}
+
+function preparePosition(rows){
+  return rows.map(r => {
+    const out = {...r};
+    out['Indexador'] = normalizeIndexador(out['Indexador']);
+    out['Data de Emissão'] = parseDateAny(out['Data de Emissão']);
+    out['Vencimento'] = parseDateAny(out['Vencimento']);
+    ['Quantidade','Quantidade Disponível','Preço Atualizado CURVA','Valor Atualizado CURVA'].forEach(c => {
+      if(c in out) out[c] = parseNum(out[c]);
+    });
+    return out;
+  }).filter(r => ['DI','PREFIXADO','IPCA'].includes(r['Indexador']));
+}
+
+function cdiDailyFromAnnual(annualPct){
+  return Math.pow(1 + annualPct/100, 1/252) - 1;
+}
+function getHistoricalCdiRows(startYMD, endYMD){
+  return state.cdi.filter(r => compareYMD(r.data, startYMD) > 0 && compareYMD(r.data, endYMD) <= 0);
+}
+function growthDI(ratePctCDI, startYMD, endYMD){
+  if(!Number.isFinite(ratePctCDI) || !startYMD || !endYMD || compareYMD(endYMD,startYMD) <= 0) return 1;
+  const ref = state.refCdiYMD;
+  const futureAnnual = parseNum(el.cdiFuturo.value);
+  const futureDaily = cdiDailyFromAnnual(futureAnnual);
+  let g = 1;
+  if(compareYMD(endYMD, ref) <= 0){
+    for(const row of getHistoricalCdiRows(startYMD, endYMD)) g *= (1 + (ratePctCDI/100) * row.taxa_diaria_decimal);
+    return g;
+  }
+  if(compareYMD(startYMD, ref) < 0){
+    for(const row of getHistoricalCdiRows(startYMD, ref)) g *= (1 + (ratePctCDI/100) * row.taxa_diaria_decimal);
+    startYMD = ref;
+  }
+  const du = busdayCount(startYMD, endYMD);
+  if(du > 0) g *= Math.pow(1 + (ratePctCDI/100) * futureDaily, du);
+  return g;
+}
+function growthPrefix(rateAnnual, startYMD, endYMD){
+  if(!Number.isFinite(rateAnnual) || !startYMD || !endYMD || compareYMD(endYMD,startYMD) <= 0) return 1;
+  const du = busdayCount(startYMD, endYMD);
+  return Math.pow(1 + rateAnnual/100, du/252);
+}
+function ipcaMonthlyFuturePct(){
+  const annual = parseNum(el.ipcaFuturo.value);
+  return (Math.pow(1 + annual/100, 1/12) - 1) * 100;
+}
+function monthKeysBetween(startYMD, endYMD){
+  if(!startYMD || !endYMD || compareYMD(endYMD,startYMD) <= 0) return [];
+  let [y,m] = yearMonth(startYMD).split('-').map(Number);
+  let [ye,me] = yearMonth(endYMD).split('-').map(Number);
+  const out = [];
+  while(y < ye || (y === ye && m <= me)){
+    out.push(`${y}-${pad2(m)}`);
+    m += 1;
+    if(m > 12){ m = 1; y += 1; }
+  }
+  return out;
+}
+function historicalIpcaMap(){
+  const map = new Map();
+  for(const r of state.ipca) map.set(r.month, r.ipca_mensal_percentual);
+  return map;
+}
+function growthIPCA(spreadAnnual, startYMD, endYMD){
+  if(!Number.isFinite(spreadAnnual) || !startYMD || !endYMD || compareYMD(endYMD,startYMD) <= 0) return 1;
+  const histMap = historicalIpcaMap();
+  const futureMonthly = ipcaMonthlyFuturePct();
+  const spreadMonthlyFactor = Math.pow(1 + spreadAnnual/100, 1/12);
+  let g = 1;
+  for(const ym of monthKeysBetween(startYMD, endYMD)){
+    const monthEndYMD = `${ym}-31`;
+    const monthPct = (state.refIpcaYMD && compareYMD(ym + '-28', state.refIpcaYMD) <= 0 && histMap.has(ym))
+      ? histMap.get(ym)
+      : futureMonthly;
+    g *= (1 + monthPct/100) * spreadMonthlyFactor;
+  }
+  return g;
+}
+
+function bisection(fn, low, high, limit=800, tol=1e-10){
+  let a=low, b=high, fa=fn(a), fb=fn(b);
+  let tries = 0;
+  while((!Number.isFinite(fa) || !Number.isFinite(fb) || fa*fb > 0) && tries < 12){
+    b *= 2;
+    fb = fn(b);
+    tries += 1;
+  }
+  if(!Number.isFinite(fa) || !Number.isFinite(fb) || fa*fb > 0) return NaN;
+  for(let i=0;i<limit;i++){
+    const m = (a+b)/2;
+    const fm = fn(m);
+    if(!Number.isFinite(fm)) return NaN;
+    if(Math.abs(fm) < tol || Math.abs(b-a) < tol) return m;
+    if(fa * fm <= 0){ b = m; fb = fm; }
+    else { a = m; fa = fm; }
   }
   return (a+b)/2;
 }
-function estimateDiRate(unitBase, price, startIso, endIso){
-  const hist = getCdiHist(startIso, endIso);
-  if(!hist.length || !Number.isFinite(price)) return NaN;
-  const fn = f => unitBase * product(hist.map(x => 1 + f*x)) - price;
-  return solveBisection(fn, 0, 3) * 100;
-}
-function theoreticalPriceDI(unitBase, ratePctCdi, startIso, endIso){
-  const hist = getCdiHist(startIso, endIso);
-  if(!hist.length) return unitBase;
-  const f = ratePctCdi/100;
-  return unitBase * product(hist.map(x => 1 + f*x));
-}
-function estimatePrefixRate(unitBase, price, startIso, endIso){
-  const n = bizDays(startIso, endIso);
-  if(!Number.isFinite(price) || n<=0 || unitBase<=0) return NaN;
-  return (Math.pow(price/unitBase, 252/n) - 1) * 100;
-}
-function theoreticalPricePrefix(unitBase, ratePct, startIso, endIso){
-  const n = bizDays(startIso, endIso);
-  if(n<=0) return unitBase;
-  return unitBase * Math.pow(1 + ratePct/100, n/252);
-}
-function getIpcaMonthlySeries(startIso, endIso){
-  return state.ipca.filter(r => new Date(r.data) > new Date(startIso) && new Date(r.data) <= new Date(endIso)).map(r => r.ipca_mensal_percentual/100);
-}
-function estimateIpcaSpread(unitBase, price, startIso, endIso, prodText){
-  const parsed = parseProductRateText(prodText);
-  if(parsed && parsed.type==='IPCA' && Number.isFinite(parsed.value)) return parsed.value;
-  const ipca = getIpcaMonthlySeries(startIso, endIso);
-  if(!ipca.length || !Number.isFinite(price)) return NaN;
-  const fn = s => unitBase * product(ipca.map(m => (1+m) * Math.pow(1 + s/100, 1/12))) - price;
-  return solveBisection(fn, -20, 40);
-}
-function theoreticalPriceIPCA(unitBase, spreadPct, startIso, endIso, fallbackAnnualIpca){
-  const ipca = getIpcaMonthlySeries(startIso, endIso);
-  let factors = [];
-  if(ipca.length){
-    factors = ipca.map(m => (1+m) * Math.pow(1 + spreadPct/100, 1/12));
-  } else {
-    const months = Math.max(1, Math.round((new Date(endIso)-new Date(startIso))/(1000*60*60*24*30.4)));
-    const ipcaM = Math.pow(1 + fallbackAnnualIpca/100, 1/12) - 1;
-    factors = Array.from({length:months}, _ => (1+ipcaM) * Math.pow(1 + spreadPct/100, 1/12));
+
+function estimateCurrentRate(row, unitBase){
+  const currentPU = parseNum(row['Preço Atualizado CURVA']);
+  const issue = row['Data de Emissão'];
+  const ref = state.refCdiYMD;
+  if(!Number.isFinite(currentPU) || !issue || !ref || compareYMD(ref, issue) <= 0) return {type: row['Indexador'], value: NaN, label: '-'};
+  if(row['Indexador'] === 'DI'){
+    const fn = pct => unitBase * growthDI(pct, issue, ref) - currentPU;
+    const pct = bisection(fn, 0, 150);
+    return {type:'DI', value:pct, label:Number.isFinite(pct) ? `${fmtNum(pct,2)}% CDI` : '-'};
   }
-  return unitBase * product(factors);
+  if(row['Indexador'] === 'PREFIXADO'){
+    const du = busdayCount(issue, ref);
+    const rate = du > 0 ? (Math.pow(currentPU / unitBase, 252/du) - 1) * 100 : NaN;
+    return {type:'PREFIXADO', value:rate, label:Number.isFinite(rate) ? `${fmtNum(rate,2)}% a.a.` : '-'};
+  }
+  if(row['Indexador'] === 'IPCA'){
+    const fn = spread => unitBase * growthIPCA(spread, issue, ref) - currentPU;
+    const spread = bisection(fn, -20, 40);
+    return {type:'IPCA', value:spread, label:Number.isFinite(spread) ? `IPCA + ${fmtNum(spread,2)}%` : '-'};
+  }
+  return {type: row['Indexador'], value: NaN, label: '-'};
 }
-function projectFuture(row, months, withMaturity){
-  const dataRef = row['Data ref'];
-  const end = addMonths(dataRef, months);
-  if(withMaturity && row['Vencimento painel ISO'] && new Date(end) > new Date(row['Vencimento painel ISO'])) return NaN;
-  const idx = row['Indexador'];
-  const price = row['Preço Atualizado CURVA'];
-  if(!Number.isFinite(price)) return NaN;
-  if(idx==='DI'){
-    const cdiFut = parseNum(el.cdiFuturo.value);
-    const daily = cdiDailyFromAnnual(cdiFut);
-    const days = bizDays(dataRef, end);
-    return price * Math.pow(1 + (row['_taxa_di_pct']/100) * daily, days);
-  }
-  if(idx==='PREFIXADO'){
-    const days = bizDays(dataRef, end);
-    return price * Math.pow(1 + row['_taxa_prefixada']/100, days/252);
-  }
-  if(idx==='IPCA'){
-    const ipcaAn = parseNum(el.ipcaFuturo.value);
-    const spread = row['_taxa_ipca_spread'];
-    const monthsN = Math.max(1, Math.round((new Date(end)-new Date(dataRef))/(1000*60*60*24*30.4)));
-    const monthly = (1 + ipcaAn/100) ** (1/12) - 1;
-    let val = price;
-    for(let i=0;i<monthsN;i++) val *= (1+monthly) * Math.pow(1 + spread/100, 1/12);
-    return val;
-  }
+
+function projectCurrentPUToTarget(row, targetYMD){
+  const currentPU = parseNum(row['Preço Atualizado CURVA']);
+  if(!Number.isFinite(currentPU) || !targetYMD) return NaN;
+  const start = state.refCdiYMD;
+  if(compareYMD(targetYMD, start) <= 0) return currentPU;
+  const rate = row._currentRate;
+  if(!rate || !Number.isFinite(rate.value)) return NaN;
+  if(rate.type === 'DI') return currentPU * growthDI(rate.value, start, targetYMD);
+  if(rate.type === 'PREFIXADO') return currentPU * growthPrefix(rate.value, start, targetYMD);
+  if(rate.type === 'IPCA') return currentPU * growthIPCA(rate.value, start, targetYMD);
   return NaN;
 }
-function preparePurchases(rows){
-  return rows.map(r => ({
-    codigo: String(r.codigo || r.Código || '').trim(),
-    data_aquisicao: excelDateToISO(r.data_aquisicao || r['Data de aquisição']),
-    valor_aquisicao: parseNum(r.valor_aquisicao),
-    custo_aquisicao: Number.isFinite(parseNum(r.custo_aquisicao)) ? parseNum(r.custo_aquisicao) : parseNum(r.valor_aquisicao),
-    fonte: r.fonte || '',
-    observacao: r.observacao || '',
-  })).filter(r => r.codigo && r.data_aquisicao && Number.isFinite(r.custo_aquisicao));
+function projectedValue(row, horizonYMD, respectMaturity){
+  const currentQty = Number.isFinite(parseNum(row['Quantidade Disponível'])) ? parseNum(row['Quantidade Disponível']) : parseNum(row['Quantidade']);
+  if(!Number.isFinite(currentQty) || currentQty <= 0) return NaN;
+  const maturity = row['Vencimento'];
+  const target = respectMaturity && maturity ? minYMD(horizonYMD, maturity) : horizonYMD;
+  const pu = projectCurrentPUToTarget(row, target);
+  return Number.isFinite(pu) ? pu * currentQty : NaN;
 }
-function getPurchaseRecords(code){
-  return state.compras.filter(r => r.codigo === code).sort((a,b) => new Date(a.data_aquisicao) - new Date(b.data_aquisicao));
-}
-function inferPurchasedQuantity(costTotal, row){
-  const qtyCurrent = parseNum(row['Quantidade Disponível']);
-  const unitBase = row['_unit_base'];
-  const rateType = row['_rate_type'];
-  let theo = NaN;
-  if(rateType === 'DI' && Number.isFinite(row['_taxa_di_pct'])){
-    theo = theoreticalPriceDI(unitBase, row['_taxa_di_pct'], row['Emissão painel ISO'], row['_purchase_date']);
-  } else if(rateType === 'PREFIXADO' && Number.isFinite(row['_taxa_prefixada'])){
-    theo = theoreticalPricePrefix(unitBase, row['_taxa_prefixada'], row['Emissão painel ISO'], row['_purchase_date']);
-  } else if(rateType === 'IPCA' && Number.isFinite(row['_taxa_ipca_spread'])){
-    theo = theoreticalPriceIPCA(unitBase, row['_taxa_ipca_spread'], row['Emissão painel ISO'], row['_purchase_date'], parseNum(el.ipcaFuturo.value));
-  } else {
-    theo = row['Preço Atualizado CURVA'];
-  }
-  if(!Number.isFinite(theo) || theo <= 0) return 1;
-  let q = Math.round(costTotal / theo);
-  if(Number.isFinite(qtyCurrent) && qtyCurrent > 0 && qtyCurrent < 10000){
-    q = clamp(q, 1, Math.round(qtyCurrent));
-  } else {
-    q = Math.max(1, q);
-  }
-  return q;
-}
+
 function estimateSecondaryRate(row){
-  const purchases = getPurchaseRecords(row['Código']);
-  if(!purchases.length) return {date:null, cost:NaN, totalCost:NaN, rateLabel:'-', note:''};
-  const latest = purchases[purchases.length - 1];
-  const totalCost = purchases.reduce((a,b)=>a + (Number.isFinite(b.custo_aquisicao)?b.custo_aquisicao:0), 0);
-  row['_purchase_date'] = latest.data_aquisicao;
-  const q = inferPurchasedQuantity(latest.custo_aquisicao, row);
-  const unitPurchase = latest.custo_aquisicao / q;
+  const purchase = state.comprasByCode.get(String(row['Código'] || '').trim());
+  if(!purchase) return {date:null, cost:NaN, pu:NaN, label:'-'};
+  const qty = Number.isFinite(parseNum(row['Quantidade Disponível'])) && parseNum(row['Quantidade Disponível']) > 0
+    ? parseNum(row['Quantidade Disponível'])
+    : parseNum(row['Quantidade']);
+  if(!Number.isFinite(qty) || qty <= 0) return {date:purchase.data_ultima_aquisicao, cost:purchase.custo_aquisicao_total, pu:NaN, label:'-'};
+  const puAcq = purchase.custo_aquisicao_total / qty;
+  const maturity = row['Vencimento'];
+  if(!maturity || compareYMD(maturity, purchase.data_ultima_aquisicao) <= 0) {
+    return {date:purchase.data_ultima_aquisicao, cost:purchase.custo_aquisicao_total, pu:puAcq, label:'-'};
+  }
+  const targetPuMaturity = projectCurrentPUToTarget(row, maturity);
+  if(!Number.isFinite(targetPuMaturity) || !Number.isFinite(puAcq) || puAcq <= 0){
+    return {date:purchase.data_ultima_aquisicao, cost:purchase.custo_aquisicao_total, pu:puAcq, label:'-'};
+  }
   let label = '-';
-  if(row['_rate_type']==='DI'){
-    const rate = estimateDiRate(row['_unit_base'], unitPurchase, row['Emissão painel ISO'], latest.data_aquisicao);
-    if(Number.isFinite(rate)) label = `${fmtNum(rate,2)}% CDI`;
-  } else if(row['_rate_type']==='PREFIXADO'){
-    const rate = estimatePrefixRate(row['_unit_base'], unitPurchase, row['Emissão painel ISO'], latest.data_aquisicao);
+  if(row['Indexador'] === 'DI'){
+    const fn = pct => puAcq * growthDI(pct, purchase.data_ultima_aquisicao, maturity) - targetPuMaturity;
+    const pct = bisection(fn, 0, 150);
+    if(Number.isFinite(pct)) label = `${fmtNum(pct,2)}% CDI`;
+  } else if(row['Indexador'] === 'PREFIXADO'){
+    const du = busdayCount(purchase.data_ultima_aquisicao, maturity);
+    const rate = du > 0 ? (Math.pow(targetPuMaturity / puAcq, 252/du) - 1) * 100 : NaN;
     if(Number.isFinite(rate)) label = `${fmtNum(rate,2)}% a.a.`;
-  } else if(row['_rate_type']==='IPCA'){
-    const spread = estimateIpcaSpread(row['_unit_base'], unitPurchase, row['Emissão painel ISO'], latest.data_aquisicao, row['Produto painel']);
+  } else if(row['Indexador'] === 'IPCA'){
+    const fn = spread => puAcq * growthIPCA(spread, purchase.data_ultima_aquisicao, maturity) - targetPuMaturity;
+    const spread = bisection(fn, -20, 40);
     if(Number.isFinite(spread)) label = `IPCA + ${fmtNum(spread,2)}%`;
   }
-  return {date: latest.data_aquisicao, cost: latest.custo_aquisicao, totalCost, rateLabel: label, note:`Qtd. inferida: ${q}`};
+  return {date:purchase.data_ultima_aquisicao, cost:purchase.custo_aquisicao_total, pu:puAcq, label};
 }
-function processar(dfPosicao, actualSheet){
-  const dataRefManual = el.dataRef.value || null;
-  const dataRef = chooseDataRef(state.cdi, dataRefManual) || (state.ipca.length ? chooseDataRef(state.ipca, dataRefManual) : null);
-  if(!dataRef) throw new Error('Não foi possível determinar a data de referência. Verifique serie_cdi.csv.');
 
-  const rows = [];
-  for(const raw of dfPosicao){
-    const idx = String(raw['Indexador'] || '').trim().toUpperCase();
-    if(!['DI','PREFIXADO','IPCA'].includes(idx)) continue;
-    const emissaoIso = excelDateToISO(raw['Data de Emissão']);
-    const vencIso = excelDateToISO(raw['Vencimento']);
-    const qtyDisp = parseNum(raw['Quantidade Disponível']);
-    const priceCurva = parseNum(raw['Preço Atualizado CURVA']);
-    const totalCurva = parseNum(raw['Valor Atualizado CURVA']);
-    if(!emissaoIso || !vencIso || !Number.isFinite(priceCurva) || !Number.isFinite(totalCurva)) continue;
-
-    const unitBase = inferUnitBase({
-      'Preço Atualizado CURVA': priceCurva,
-      'Quantidade Disponível': qtyDisp,
-      'Valor Atualizado CURVA': totalCurva
-    });
-
-    let taxaPainel = '-';
-    let rateType = idx;
-    let taxaDiPct = NaN, taxaPrefix = NaN, taxaIpcaSpread = NaN;
-
-    if(idx === 'DI'){
-      taxaDiPct = estimateDiRate(unitBase, priceCurva, emissaoIso, dataRef);
-      const parsed = parseProductRateText(raw['Produto']);
-      if((!Number.isFinite(taxaDiPct) || taxaDiPct<=0) && parsed && parsed.type==='DI') taxaDiPct = parsed.value;
-      taxaPainel = Number.isFinite(taxaDiPct) ? `${fmtNum(taxaDiPct,2)}% CDI` : '-';
-    } else if(idx === 'PREFIXADO'){
-      taxaPrefix = estimatePrefixRate(unitBase, priceCurva, emissaoIso, dataRef);
-      const parsed = parseProductRateText(raw['Produto']);
-      if((!Number.isFinite(taxaPrefix) || taxaPrefix<=0) && parsed && parsed.type==='PREFIXADO') taxaPrefix = parsed.value;
-      taxaPainel = Number.isFinite(taxaPrefix) ? `${fmtNum(taxaPrefix,2)}% a.a.` : '-';
-    } else if(idx === 'IPCA'){
-      taxaIpcaSpread = estimateIpcaSpread(unitBase, priceCurva, emissaoIso, dataRef, raw['Produto']);
-      taxaPainel = Number.isFinite(taxaIpcaSpread) ? `IPCA + ${fmtNum(taxaIpcaSpread,2)}%` : '-';
-    }
-
-    const row = {
-      'Produto painel': raw['Produto'] || '-',
-      'Emissor painel': raw['Emissor'] || raw['Instituição'] || '-',
-      'Código': raw['Código'] || '-',
-      'Indexador': idx,
-      'Emissão painel': fmtDate(emissaoIso),
-      'Emissão painel ISO': emissaoIso,
-      'Vencimento painel': fmtDate(vencIso),
-      'Vencimento painel ISO': vencIso,
-      'Taxa painel': taxaPainel,
-      'Valor Atualizado CURVA': totalCurva,
-      'Preço Atualizado CURVA': priceCurva,
-      'Quantidade Disponível': qtyDisp,
-      'Data ref': dataRef,
-      '_unit_base': unitBase,
-      '_rate_type': rateType,
-      '_taxa_di_pct': taxaDiPct,
-      '_taxa_prefixada': taxaPrefix,
-      '_taxa_ipca_spread': taxaIpcaSpread,
+function buildPanelRows(positionRows){
+  const horizon12 = addMonthsYMD(state.todayYMD, 12);
+  return positionRows.map(row => {
+    const unitBase = inferUnitBase(row);
+    row._unitBase = unitBase;
+    row._currentRate = estimateCurrentRate(row, unitBase);
+    const secondary = estimateSecondaryRate(row);
+    return {
+      ...row,
+      'Produto painel': row['Produto'] || '-',
+      'Emissor painel': row['Emissor'] || row['Instituição'] || '-',
+      'Emissão painel': row['Data de Emissão'],
+      'Vencimento painel': row['Vencimento'],
+      'Taxa painel': row._currentRate.label,
+      'Data aquisição': secondary.date,
+      'Custo aquisição': secondary.cost,
+      'PU aquisição': secondary.pu,
+      'Taxa compra secundário': secondary.label,
+      'Valor projetado 12m com vencimento': projectedValue(row, horizon12, true),
+      'Valor projetado 12m sem vencimento': projectedValue(row, horizon12, false),
     };
-
-    const sec = estimateSecondaryRate(row);
-    row['Data aquisição'] = fmtDate(sec.date);
-    row['Custo aquisição'] = Number.isFinite(sec.totalCost) ? sec.totalCost : NaN;
-    row['Taxa compra secundário'] = sec.rateLabel;
-    row['_sec_note'] = sec.note;
-
-    row['Valor projetado com vencimento'] = projectFuture(row, 12, true);
-    row['Valor projetado sem vencimento'] = projectFuture(row, 12, false);
-
-    rows.push(row);
-  }
-
-  state.rows = rows;
-  state.sortCol = 'Vencimento painel';
-  state.sortDir = 'asc';
-
-  const emissores = [...new Set(rows.map(r => r['Emissor painel']).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR'));
-  const opts = emissores.map(v => `<option value="${escapeHtml(String(v))}">${escapeHtml(String(v))}</option>`).join('');
-  el.filtroEmissorIncluir.innerHTML = opts;
-  el.filtroEmissorExcluir.innerHTML = opts;
-  el.filtros.classList.remove('hidden');
-  el.painelAnalitico.classList.remove('hidden');
-  applyFilters();
-  setStatus(`Processamento concluído. Aba usada: ${actualSheet}. Linhas processadas: ${rows.length}. Data de referência: ${fmtDate(dataRef)}.`);
+  });
 }
-function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
-function selectedValues(selectEl){ return [...selectEl.selectedOptions].map(o => o.value); }
-function compareVals(a,b){
-  const na = parseNum(a), nb = parseNum(b);
-  if(Number.isFinite(na) && Number.isFinite(nb)) return na-nb;
-  const da = new Date(a), db = new Date(b);
-  if(!Number.isNaN(da.getTime()) && !Number.isNaN(db.getTime())) return da-db;
-  return String(a??'').localeCompare(String(b??''),'pt-BR');
-}
-function applyFilters(){
-  let rows = [...state.rows];
-  const busca = el.filtroBusca.value.toLowerCase().trim();
-  const idx = el.filtroIndexador.value;
-  const include = selectedValues(el.filtroEmissorIncluir);
-  const exclude = selectedValues(el.filtroEmissorExcluir);
 
-  if(busca){
-    rows = rows.filter(r => ['Produto painel','Emissor painel','Código','Taxa painel'].some(k => String(r[k]||'').toLowerCase().includes(busca)));
-  }
-  if(idx) rows = rows.filter(r => r['Indexador'] === idx);
-  if(include.length) rows = rows.filter(r => include.includes(r['Emissor painel']));
-  if(exclude.length) rows = rows.filter(r => !exclude.includes(r['Emissor painel']));
-
-  rows.sort((a,b)=>compareVals(a[state.sortCol], b[state.sortCol]) * (state.sortDir==='desc' ? -1 : 1));
-  state.filtered = rows;
-  renderSummary(rows);
-  renderMain(rows);
-  renderCronograma(rows);
-  el.btnExportar.disabled = !rows.length;
+function card(label, value, sub=''){
+  return `<div class="card"><span class="label">${label}</span><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
 }
 function renderSummary(rows){
-  const totalCurva = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor Atualizado CURVA'])?r['Valor Atualizado CURVA']:0),0);
-  const totalCompra = rows.reduce((a,r)=>a + (Number.isFinite(r['Custo aquisição'])?r['Custo aquisição']:0),0);
-  const diff = Number.isFinite(totalCompra) && totalCompra!==0 ? totalCurva-totalCompra : NaN;
-  const diffPct = Number.isFinite(totalCompra) && totalCompra!==0 ? diff/totalCompra*100 : NaN;
-  const totalProjCom = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor projetado com vencimento'])?r['Valor projetado com vencimento']:0),0);
-  const totalProjSem = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor projetado sem vencimento'])?r['Valor projetado sem vencimento']:0),0);
-
-  const cards = [
-    {l:'Linhas filtradas',v:String(rows.length),s:'Após aplicar todos os filtros'},
-    {l:'Custo de aquisição conhecido',v:fmtCur(totalCompra),s:'Somatório das linhas com compra mapeada'},
-    {l:'Valor atualizado na curva',v:fmtCur(totalCurva),s:'Somatório da posição filtrada'},
-    {l:'Diferença',v:fmtCur(diff),s:Number.isFinite(diffPct)?`${fmtPct(diffPct)} sobre o custo conhecido`:'Sem base suficiente'},
-    {l:'Projeção 12m com vencimento',v:fmtCur(totalProjCom),s:'Hipótese 1'},
-    {l:'Projeção 12m sem vencimento',v:fmtCur(totalProjSem),s:'Hipótese 2'},
-  ];
-  el.sumario.innerHTML = cards.map(c => `<div class="card"><span class="label">${c.l}</span><div class="value">${c.v}</div><div class="sub">${c.s}</div></div>`).join('');
+  const totalCurve = rows.reduce((a,b)=>a + (parseNum(b['Valor Atualizado CURVA']) || 0), 0);
+  const knownCostRows = rows.filter(r => Number.isFinite(parseNum(r['Custo aquisição'])));
+  const totalCost = knownCostRows.reduce((a,b)=>a + parseNum(b['Custo aquisição']), 0);
+  const diff = totalCurve - totalCost;
+  const diffPct = totalCost > 0 ? (diff / totalCost) * 100 : NaN;
+  const totalProjMat = rows.reduce((a,b)=>a + (parseNum(b['Valor projetado 12m com vencimento']) || 0), 0);
+  const totalProjNoMat = rows.reduce((a,b)=>a + (parseNum(b['Valor projetado 12m sem vencimento']) || 0), 0);
+  el.sumario.innerHTML = [
+    card('Ativos filtrados', String(rows.length), `Ref. computador: ${fmtDate(state.todayYMD)} | CDI: ${fmtDate(state.refCdiYMD)}`),
+    card('Custo de aquisição conhecido', fmtCur(totalCost), `${knownCostRows.length} ativos com compra conhecida`),
+    card('Valor atualizado na curva', fmtCur(totalCurve), 'Soma no recorte filtrado'),
+    card('Diferença', fmtCur(diff), `Diferença percentual: ${fmtPct(diffPct)}`),
+    card('Proj. 12m com vencimento', fmtCur(totalProjMat), 'Parando no vencimento, se houver'),
+    card('Proj. 12m sem vencimento', fmtCur(totalProjNoMat), 'Ignorando vencimento'),
+  ].join('');
   el.sumario.classList.remove('hidden');
 }
-function renderMain(rows){
-  el.tabelaMainHead.innerHTML = `<tr>${MAIN_COLUMNS.map(c=>`<th data-col="${escapeHtml(c)}">${escapeHtml(c)}</th>`).join('')}</tr>`;
-  el.tabelaMainBody.innerHTML = rows.map(r => `<tr>${MAIN_COLUMNS.map(c => cellHtml(c, r[c], r)).join('')}</tr>`).join('');
-  el.tabelaMainHead.querySelectorAll('th').forEach(th => th.onclick = () => {
-    const col = th.dataset.col;
-    if(state.sortCol===col) state.sortDir = state.sortDir==='asc' ? 'desc' : 'asc';
-    else { state.sortCol=col; state.sortDir='asc'; }
-    applyFilters();
-  });
+function populateEmitterFilters(rows){
+  const emissores = [...new Set(rows.map(r => String(r['Emissor painel'] || '').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const options = emissores.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  el.filtroEmissorIncluir.innerHTML = options;
+  el.filtroEmissorExcluir.innerHTML = options;
+  el.filtros.classList.remove('hidden');
 }
-function cellHtml(col, val, row){
-  if(numericCols.has(col)) return `<td class="right">${fmtCur(val)}</td>`;
-  if(col==='Taxa compra secundário') return `<td title="${escapeHtml(row['_sec_note'] || '')}">${escapeHtml(String(val || '-'))}</td>`;
-  if(col.includes('painel') || col==='Data aquisição') return `<td>${escapeHtml(String(val || '-'))}</td>`;
-  return `<td>${escapeHtml(String(val || '-'))}</td>`;
+function escapeHtml(s){
+  return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 }
-function renderCronograma(rows){
-  const map = new Map();
-  for(const r of rows){
-    const key = formatMonthKey(r['Vencimento painel ISO']);
-    if(!map.has(key)) map.set(key, {mes:key, quantidade:0, curva:0, compra:0});
-    const o = map.get(key);
-    o.quantidade += 1;
-    o.curva += Number.isFinite(r['Valor Atualizado CURVA']) ? r['Valor Atualizado CURVA'] : 0;
-    o.compra += Number.isFinite(r['Custo aquisição']) ? r['Custo aquisição'] : 0;
+function compareValues(a,b,col){
+  const an = parseNum(a), bn = parseNum(b);
+  if(Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  if((col || '').includes('painel') || (col || '').includes('aquisição') || (col || '').includes('Vencimento')){
+    if(a && b && /^\d{4}-\d{2}-\d{2}$/.test(String(a)) && /^\d{4}-\d{2}-\d{2}$/.test(String(b))) return compareYMD(a,b);
   }
-  const arr = [...map.values()].sort((a,b)=>a.mes.localeCompare(b.mes));
-  el.tabelaCronHead.innerHTML = '<tr><th>Mês</th><th class="right">Qtde</th><th class="right">Curva</th><th class="right">Aquisição</th></tr>';
-  el.tabelaCronBody.innerHTML = arr.map(r => `<tr><td>${r.mes}</td><td class="right">${fmtNum(r.quantidade,0)}</td><td class="right">${fmtCur(r.curva)}</td><td class="right">${fmtCur(r.compra)}</td></tr>`).join('');
+  return String(a ?? '').localeCompare(String(b ?? ''), 'pt-BR');
 }
-function preparePosicao(rows){
-  return rows.map(r => {
-    const o = {...r};
-    ['Quantidade','Quantidade Disponível','Quantidade Indisponível','Preço Atualizado MTM','Valor Atualizado MTM','Preço Atualizado CURVA','Valor Atualizado CURVA','Preço Atualizado FECHAMENTO','Valor Atualizado FECHAMENTO']
-      .forEach(c => { if(Object.prototype.hasOwnProperty.call(o,c)) o[c]=parseNum(o[c]); });
-    return o;
+function renderMainTable(rows){
+  el.tabelaMainHead.innerHTML = `<tr>${MAIN_COLUMNS.map(c => `<th data-col="${escapeHtml(c)}">${escapeHtml(c)}</th>`).join('')}</tr>`;
+  el.tabelaMainBody.innerHTML = rows.map(r => `<tr>${MAIN_COLUMNS.map(c => renderCell(c, r[c])).join('')}</tr>`).join('');
+  el.tabelaMainHead.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if(state.sortCol === col) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+      else { state.sortCol = col; state.sortDir = 'asc'; }
+      applyFilters();
+    });
   });
 }
-function prepareCdi(rows){
-  return rows.map(r => ({
-    data: excelDateToISO(r.data),
-    taxa_anual_percentual: parseNum(r.taxa_anual_percentual),
-    taxa_diaria_decimal: Number.isFinite(parseNum(r.taxa_diaria_decimal)) ? parseNum(r.taxa_diaria_decimal) :
-      (Number.isFinite(parseNum(r.taxa_anual_percentual)) ? cdiDailyFromAnnual(parseNum(r.taxa_anual_percentual)) : NaN)
-  })).filter(r => r.data && Number.isFinite(r.taxa_diaria_decimal)).sort((a,b)=>new Date(a.data)-new Date(b.data));
-}
-function prepareIpca(rows){
-  return rows.map(r => ({
-    data: excelDateToISO(r.data),
-    ipca_mensal_percentual: parseNum(r.ipca_mensal_percentual || r.ipca_percentual || r.ipca || r.valor || r.percentual),
-  })).filter(r => r.data && Number.isFinite(r.ipca_mensal_percentual)).sort((a,b)=>new Date(a.data)-new Date(b.data));
-}
-function exportExcel(){
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.filtered), 'Painel');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.cdi), 'Serie_CDI');
-  if(state.ipca.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.ipca), 'Serie_IPCA');
-  if(state.compras.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.compras), 'Compras');
-  XLSX.writeFile(wb, 'painel_leve_curva_secundario.xlsx');
-}
-function resetUI(){
-  state.rows=[]; state.filtered=[]; state.cdi=[]; state.ipca=[]; state.compras=[];
-  el.arquivoPosicao.value=''; el.filtroBusca.value=''; el.filtroIndexador.value=''; el.filtroEmissorIncluir.innerHTML=''; el.filtroEmissorExcluir.innerHTML='';
-  el.sumario.classList.add('hidden'); el.filtros.classList.add('hidden'); el.painelAnalitico.classList.add('hidden');
-  el.tabelaMainHead.innerHTML=''; el.tabelaMainBody.innerHTML=''; el.tabelaCronHead.innerHTML=''; el.tabelaCronBody.innerHTML='';
-  el.btnExportar.disabled=true; setStatus('');
+function renderCell(col, value){
+  if(NUMERIC_COLUMNS.has(col)) return `<td class="right">${fmtCur(parseNum(value))}</td>`;
+  if(col === 'PU aquisição') return `<td class="right">${Number.isFinite(parseNum(value)) ? fmtNum(parseNum(value),2) : '-'}</td>`;
+  if(col === 'Taxa painel' || col === 'Taxa compra secundário') return `<td>${escapeHtml(String(value || '-'))}</td>`;
+  if(col.includes('painel') || col.includes('aquisição')){
+    if(typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return `<td>${fmtDate(value)}</td>`;
+  }
+  return `<td>${escapeHtml(String(value ?? '-'))}</td>`;
 }
 
-el.btnProcessar.onclick = async () => {
+function buildSchedule(rows){
+  const groups = new Map();
+  for(const row of rows){
+    const venc = row['Vencimento painel'];
+    if(!venc) continue;
+    const ym = yearMonth(venc);
+    if(!groups.has(ym)) groups.set(ym, {ym, count:0, totalCurve:0, assets:[]});
+    const g = groups.get(ym);
+    g.count += 1;
+    g.totalCurve += parseNum(row['Valor Atualizado CURVA']) || 0;
+    g.assets.push(row);
+  }
+  const ordered = [...groups.values()].sort((a,b)=>a.ym.localeCompare(b.ym));
+  if(!state.selectedMonth || !groups.has(state.selectedMonth)) state.selectedMonth = ordered[0]?.ym || null;
+
+  el.tabelaCronogramaHead.innerHTML = '<tr><th>Mês</th><th class="right">Qtde</th><th class="right">Valor na curva</th></tr>';
+  el.tabelaCronogramaBody.innerHTML = ordered.map(g => `
+    <tr data-month="${g.ym}" style="${state.selectedMonth===g.ym ? 'background:#152248' : ''}">
+      <td>${yearMonthLabel(g.ym)}</td>
+      <td class="right">${g.count}</td>
+      <td class="right">${fmtCur(g.totalCurve)}</td>
+    </tr>
+  `).join('');
+  el.tabelaCronogramaBody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => { state.selectedMonth = tr.dataset.month; buildSchedule(rows); });
+  });
+
+  const selected = ordered.find(g => g.ym === state.selectedMonth);
+  el.cronogramaTitulo.textContent = selected ? `Ativos a vencer em ${yearMonthLabel(selected.ym)}` : 'Ativos do mês selecionado';
+  const assetCols = ['Produto painel','Código','Emissor painel','Vencimento painel','Valor Atualizado CURVA'];
+  el.tabelaCronogramaAtivosHead.innerHTML = `<tr>${assetCols.map(c => `<th>${c === 'Vencimento painel' ? 'Vencimento' : escapeHtml(c.replace(' painel',''))}</th>`).join('')}</tr>`;
+  el.tabelaCronogramaAtivosBody.innerHTML = selected ? selected.assets
+    .sort((a,b)=>compareValues(a['Vencimento painel'], b['Vencimento painel'], 'Vencimento painel'))
+    .map(r => `<tr>${assetCols.map(c => renderCell(c, r[c])).join('')}</tr>`).join('') : '';
+}
+
+function applyFilters(){
+  const q = el.filtroBusca.value.toLowerCase().trim();
+  const idx = el.filtroIndexador.value;
+  const inc = selectedValues(el.filtroEmissorIncluir);
+  const exc = selectedValues(el.filtroEmissorExcluir);
+
+  let rows = [...state.rows];
+  if(q){
+    rows = rows.filter(r => [r['Produto painel'], r['Emissor painel'], r['Código']].some(v => String(v || '').toLowerCase().includes(q)));
+  }
+  if(idx) rows = rows.filter(r => r['Indexador'] === idx);
+  if(inc.length) rows = rows.filter(r => inc.includes(String(r['Emissor painel'] || '')));
+  if(exc.length) rows = rows.filter(r => !exc.includes(String(r['Emissor painel'] || '')));
+
+  const dir = state.sortDir === 'desc' ? -1 : 1;
+  rows.sort((a,b)=>compareValues(a[state.sortCol], b[state.sortCol], state.sortCol) * dir);
+
+  state.filtered = rows;
+  renderSummary(rows);
+  renderMainTable(rows);
+  buildSchedule(rows);
+  el.painelAnalitico.classList.remove('hidden');
+}
+
+function exportExcel(){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.filtered.length ? state.filtered : state.rows), 'Painel');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.cdi), 'Serie_CDI');
+  if(state.ipca.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.ipca), 'Serie_IPCA');
+  const comprasArr = [...state.comprasByCode.values()];
+  if(comprasArr.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(comprasArr), 'Compras');
+  XLSX.writeFile(wb, 'painel_curva_secundario_vencimentos.xlsx');
+}
+
+function resetUI(){
+  state.rows = [];
+  state.filtered = [];
+  state.cdi = [];
+  state.ipca = [];
+  state.comprasByCode = new Map();
+  state.selectedMonth = null;
+  el.arquivoPosicao.value = '';
+  el.filtroBusca.value = '';
+  el.filtroIndexador.value = '';
+  el.filtroEmissorIncluir.innerHTML = '';
+  el.filtroEmissorExcluir.innerHTML = '';
+  el.sumario.classList.add('hidden');
+  el.filtros.classList.add('hidden');
+  el.painelAnalitico.classList.add('hidden');
+  el.tabelaMainHead.innerHTML = '';
+  el.tabelaMainBody.innerHTML = '';
+  el.tabelaCronogramaHead.innerHTML = '';
+  el.tabelaCronogramaBody.innerHTML = '';
+  el.tabelaCronogramaAtivosHead.innerHTML = '';
+  el.tabelaCronogramaAtivosBody.innerHTML = '';
+  el.btnExportar.disabled = true;
+  setStatus('');
+}
+
+async function processAll(){
+  if(!el.arquivoPosicao.files[0]) throw new Error('Selecione a planilha de posição.');
+  const todayYMD = localTodayYMD();
+  state.todayYMD = todayYMD;
+  el.todayDisplay.value = fmtDate(todayYMD);
+
+  const {rows: posRows, actualSheet} = await readExcel(el.arquivoPosicao.files[0], el.nomeAba.value.trim() || 'Renda Fixa');
+  const cdiFetch = await fetchCsvOptional(['./serie_cdi.csv']);
+  if(!cdiFetch.rows.length) throw new Error('Não foi possível carregar ./serie_cdi.csv.');
+  const ipcaFetch = await fetchCsvOptional(['./serie_ipca.csv']);
+  const comprasFetch = await fetchCsvOptional([
+    './compras_secundario_por_codigo_atualizado_posicao_detalhada.csv',
+    './compras_secundario_por_codigo_auditado.csv',
+    './compras_secundario_atualizado_posicao_detalhada.csv',
+    './compras_secundario_auditado.csv',
+    './compras_secundario_atualizado.csv',
+    './compras_secundario.csv'
+  ]);
+
+  state.cdi = prepareCdi(cdiFetch.rows);
+  state.ipca = prepareIpca(ipcaFetch.rows);
+  state.comprasByCode = aggregatePurchases(comprasFetch.rows);
+  state.refCdiYMD = chooseRefDate(state.cdi, todayYMD);
+  state.refIpcaYMD = state.ipca.length ? chooseRefDate(state.ipca, todayYMD) : todayYMD;
+
+  if(!state.refCdiYMD) throw new Error('A série CDI ficou vazia após a leitura do CSV.');
+
+  const position = preparePosition(posRows);
+  state.rows = buildPanelRows(position);
+  populateEmitterFilters(state.rows);
+  applyFilters();
+  el.btnExportar.disabled = false;
+
+  setStatus(
+    `Processamento concluído. Aba usada: ${actualSheet}. ` +
+    `Ativos processados: ${state.rows.length}. ` +
+    `CDI de referência: ${fmtDate(state.refCdiYMD)}. ` +
+    `IPCA de referência: ${state.ipca.length ? fmtDate(state.refIpcaYMD) : 'não carregado'}. ` +
+    `Compras carregadas: ${state.comprasByCode.size} códigos.`
+  );
+}
+
+el.btnProcessar.addEventListener('click', async () => {
   try{
-    if(!el.arquivoPosicao.files[0]) throw new Error('Selecione a planilha de posição.');
     el.btnProcessar.disabled = true;
-    setStatus('Lendo planilha e carregando séries do repositório...');
-    const {rows: posRows, actualSheet} = await readExcel(el.arquivoPosicao.files[0], el.nomeAba.value.trim() || 'Renda Fixa');
-    const cdiPack = await fetchCsvOptional(['./serie_cdi.csv']);
-    if(!cdiPack.rows.length) throw new Error('Não foi possível carregar ./serie_cdi.csv.');
-    const ipcaPack = await fetchCsvOptional(['./serie_ipca.csv']);
-    const comprasPack = await fetchCsvOptional(['./compras_secundario_atualizado.csv','./compras_secundario.csv']);
-    state.cdi = prepareCdi(cdiPack.rows);
-    state.ipca = prepareIpca(ipcaPack.rows);
-    state.compras = preparePurchases(comprasPack.rows);
-    processar(preparePosicao(posRows), actualSheet);
-    setStatus(
-      `Processamento concluído. Aba usada: ${actualSheet}. ` +
-      `CDI: ${state.cdi.length} registros. ` +
-      `IPCA: ${state.ipca.length} registros. ` +
-      `Compras: ${state.compras.length} registros.`
-    );
+    setStatus('Lendo a planilha e carregando os CSVs do repositório...');
+    await processAll();
   }catch(err){
     console.error(err);
     setStatus(`Erro: ${err.message || err}`);
   }finally{
     el.btnProcessar.disabled = false;
   }
-};
-el.btnExportar.onclick = exportExcel;
-el.btnLimpar.onclick = resetUI;
-el.filtroBusca.oninput = applyFilters;
-el.filtroIndexador.onchange = applyFilters;
-el.filtroEmissorIncluir.onchange = applyFilters;
-el.filtroEmissorExcluir.onchange = applyFilters;
+});
+el.btnExportar.addEventListener('click', exportExcel);
+el.btnLimpar.addEventListener('click', resetUI);
+el.filtroBusca.addEventListener('input', applyFilters);
+el.filtroIndexador.addEventListener('change', applyFilters);
+el.filtroEmissorIncluir.addEventListener('change', applyFilters);
+el.filtroEmissorExcluir.addEventListener('change', applyFilters);
+
+state.todayYMD = localTodayYMD();
+el.todayDisplay.value = fmtDate(state.todayYMD);
 </script>
 </body>
 </html>
