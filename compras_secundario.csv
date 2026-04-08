@@ -1,87 +1,98 @@
-codigo,data_aquisicao,valor_aquisicao,custo_aquisicao,fonte,id_origem,vencimento_ref,observacao,confianca_inferencia,produto_origem,indexador_origem
-21A00390271,2026-04-07,146.4,146.4,posicao_detalhada_2026_04_08,,2026-07-01,venc=2026-07-01; qty=10806.0; pu=0.01; score=28,alta,LCI BANCO SANTANDER SA - JUL/2026,PREFIXADO
-21B00071725,2026-04-01,2760.98,2760.98,posicao_detalhada_2026_04_08,,2027-02-03,venc=2027-02-03; qty=2.0; pu=1383.36; score=13,alta,LCA BTG PACTUAL - FEV/2027,PREFIXADO
-21C00573069,2026-04-01,5710.0,5710.0,posicao_detalhada_2026_04_08,,2027-03-15,venc=2027-03-15; qty=4.0; pu=1430.47; score=13,alta,LCA BTG PACTUAL - MAR/2027,PREFIXADO
-21J00652572,2026-04-01,1522.59,1522.59,posicao_detalhada_2026_04_08,,2026-10-14,venc=2026-10-14; qty=1.0; pu=1525.76; score=21,alta,LCA BTG PACTUAL - OUT/2026,PREFIXADO
-21J00680410,2026-04-01,3070.41,3070.41,posicao_detalhada_2026_04_08,,2026-10-19,venc=2026-10-19; qty=2.0; pu=1538.4; score=21,alta,LCA BTG PACTUAL - OUT/2026,PREFIXADO
-22A00698268,2026-04-07,2469.04,2469.04,posicao_detalhada_2026_04_08,,2032-01-23,venc=2032-01-23; qty=2.0; pu=1235.26; score=13,alta,LCA BTG PACTUAL - JAN/2032,IPCA
-23K02257805,2026-02-24,1306.8,1306.8,posicao_detalhada_2026_04_08,,2028-11-22,venc=2028-11-22; qty=1.0; pu=1328.44; score=11,media,LCA BANCO CNH CAPITAL S/A - NOV/2028,DI
-23K02257805,2026-03-25,7931.81,7931.81,posicao_detalhada_2026_04_08,,2028-11-22,venc=2028-11-22; qty=6.0; pu=1328.44; score=11,media,LCA BANCO CNH CAPITAL S/A - NOV/2028,DI
-24F02320837,2026-03-25,19601.13,19601.13,historico_original_codigo,,,,,,
-24G02045774,2026-03-25,7300.9,7300.9,historico_original_codigo,,,,,,
-24J04993393,2026-04-07,10185.21,10185.21,posicao_detalhada_2026_04_08,,2026-10-30,venc=2026-10-30; qty=103.0; pu=98.94; score=26,alta,LCA BANCO BV S/A - JURO MENSAL - OUT/2026,PREFIXADO
-25A02306041,2025-12-10,4496.85,4496.85,historico_original_codigo,,,,,,
-25A02529513,2025-12-11,1123.82,1123.82,historico_original_codigo,,,,,,
-25A02788785,2025-12-04,7848.26,7848.26,historico_original_codigo,,,,,,
-25A02788791,2025-12-12,7827.97,7827.97,historico_original_codigo,,,,,,
-25B02178918,2025-12-11,55608.8,55608.8,historico_original_codigo,,,,,,
-25C03943216,2025-12-10,64689.88,64689.88,historico_original_codigo,,,,,,
-25C04602211,2026-03-31,98.0,98.0,posicao_detalhada_2026_04_08,,2029-03-26,venc=2029-03-26; qty=1.0; pu=98.23; score=20,alta,LCA BANCO BV S/A - JURO MENSAL - MAR/2029,PREFIXADO
-25G04173307,2026-03-31,1195.53,1195.53,posicao_detalhada_2026_04_08,,2026-04-20,venc=2026-04-20; qty=11.0; pu=109.0; score=26,alta,LCA BANCO BV S/A - ABR/2026,PREFIXADO
-25H00071686\r,2025-12-08,11427.21,11427.21,historico_original_codigo,,,,,,
-25H03632582,2026-03-10,2053.78,2053.78,posicao_detalhada_2026_04_08,,2028-08-21,venc=2028-08-21; qty=2.0; pu=1037.26; score=13,alta,LCI BARI HIPOTECARIA - AGO/2028,PREFIXADO
-25I03347120,2025-12-09,56119.57,56119.57,posicao_detalhada_2026_04_08,,2026-09-18,venc=2026-09-18; qty=55.0; pu=1066.53; score=26,alta,LCI BRB - SET/2026,DI
-25I03347120,2025-12-09,74485.97,74485.97,historico_original_codigo,,,,,,
-25J02757799,2026-03-31,526.99,526.99,posicao_detalhada_2026_04_08,,2026-04-16,venc=2026-04-16; qty=5.0; pu=105.7; score=26,alta,LCA BANCO BV S/A - ABR/2026,PREFIXADO
-25J02848707,2026-04-07,2111.67,2111.67,posicao_detalhada_2026_04_08,,2026-04-17,venc=2026-04-17; qty=20.0; pu=105.64; score=26,alta,LCA BANCO BV S/A - ABR/2026,PREFIXADO
-25J04674430,2025-10-28,1000.0,1000.0,historico_original_codigo,,,,,,
-25J04674430,2025-10-28,6000.0,6000.0,historico_original_codigo,,,,,,
-25J04674430,2025-10-28,72700.0,72700.0,posicao_detalhada_2026_04_08,,2026-10-28,venc=2026-10-28; qty=727.0; pu=105.95; score=29,alta,LCI BRB - OUT/2026,DI
-25J04674430,2025-10-28,93000.0,93000.0,historico_original_codigo,,,,,,
-25K02828431,2026-02-13,1019.67,1019.67,posicao_detalhada_2026_04_08,,2027-11-18,venc=2027-11-18; qty=1.0; pu=1038.73; score=26,alta,LCI BRB - NOV/2027,DI
-25L00519473,2025-12-03,18000.0,18000.0,posicao_detalhada_2026_04_08,,2027-12-03,venc=2027-12-03; qty=1800000.0; pu=0.01; score=31,alta,LCI BANCO BARI DE INVESTIMENT - DEZ/2027,DI
-25L00519480,2025-12-03,8000.0,8000.0,posicao_detalhada_2026_04_08,,2028-12-04,venc=2028-12-04; qty=800000.0; pu=0.01; score=31,alta,LCI BANCO BARI DE INVESTIMENT - DEZ/2028,DI
-25L00519482,2025-12-03,4000.0,4000.0,posicao_detalhada_2026_04_08,,2029-12-03,venc=2029-12-03; qty=400000.0; pu=0.01; score=31,alta,LCI BANCO BARI DE INVESTIMENT - DEZ/2029,DI
-CDB124C2KA1,2026-01-06,2514.33,2514.33,historico_original_codigo,,,,,,
-CDB1268NKX4,2026-04-06,2680.49,2680.72,anexo_2026_04_08,5446960.0,2032-01-21,Inferido por vencimento único no anexo de posição.,,,
-CDB222OOJ0S,2026-01-14,54562.65,54562.65,historico_original_codigo,,,,,,
-CDB2234LOBB,2026-01-26,31059.84,31059.84,historico_original_codigo,,,,,,
-CDB2247JHUV,2026-01-06,2327.68,2327.68,historico_original_codigo,,,,,,
-CDB2261OZ94,2026-04-07,1234.16,1234.2,anexo_2026_04_08,5460501.0,2032-02-02,Inferido por vencimento único no anexo de posição.,,,
-CDB322OGG24,2026-01-13,9532.31,9532.31,historico_original_codigo,,,,,,
-CDB3249ITIX,2025-12-29,8568.19,8568.19,historico_original_codigo,,,,,,
-CDB324DLNKL,2025-12-24,11193.94,11193.94,historico_original_codigo,,,,,,
-CDB3255H9FH,2026-01-16,5228.27,5228.27,historico_original_codigo,,,,,,
-CDB3256HA12,2026-03-25,19780.06,19780.06,historico_original_codigo,,,,,,
-CDB325C2TBT,2026-03-18,3352.03,3352.03,historico_original_codigo,,,,,,
-CDB4216TIXP,2026-01-15,31731.55,31731.55,historico_original_codigo,,,,,,
-CDB422F0AJL,2026-03-03,1471.9,1471.9,historico_original_codigo,,,,,,
-CDB42461DLX,2026-01-14,1181.12,1181.12,historico_original_codigo,,,,,,
-CDB42483IKK,2025-12-16,13179.22,13179.22,historico_original_codigo,,,,,,
-CDB4250RI74,2026-03-10,2210.75,2210.75,historico_original_codigo,,,,,,
-CDB4251NURF,2026-02-27,10190.16,10190.16,historico_original_codigo,,,,,,
-CDB4254QFY1,2026-03-23,9770.46,9770.46,posicao_detalhada_2026_04_08,,2030-04-08,venc=2030-04-08; qty=9.0; pu=1093.07; score=14,alta,CDB BANCO DIGIMAIS S.A. - ABR/2030,PREFIXADO
-CDB425718JW,2026-03-19,1088.49,1088.49,posicao_detalhada_2026_04_08,,2030-04-15,venc=2030-04-15; qty=1.0; pu=1097.34; score=14,alta,CDB BANCO DIGIMAIS S.A. - ABR/2030,PREFIXADO
-CDB4259FZ4J,2026-04-06,7.56,7.57,anexo_2026_04_08,5446958.0,2028-04-10,Inferido por vencimento; um dos dois códigos com o mesmo vencimento.,,,
-CDB425A5P8W,2026-04-06,7.55,7.56,anexo_2026_04_08,5446972.0,2028-04-10,Inferido por vencimento; segundo código com o mesmo vencimento.,,,
-CDB425A5P9D,2026-03-18,2156.39,2156.39,historico_original_codigo,,,,,,
-CDB5249B4DW,2026-03-16,2150.59,2150.59,historico_original_codigo,,,,,,
-CDB6245943T,2026-01-21,13334.6,13334.6,historico_original_codigo,,,,,,
-CDB7248Z3TO,2026-01-22,35293.42,35293.42,historico_original_codigo,,,,,,
-CDB7249F92D,2025-12-16,11766.49,11766.49,historico_original_codigo,,,,,,
-CDB7249F95I,2026-03-20,1141.13,1141.13,historico_original_codigo,,,,,,
-CDB8241YTM1,2026-04-06,1.21,1.21,anexo_2026_04_08,5446997.0,2028-08-04,Inferido por vencimento único no anexo de posição.,,,
-CDB9242Q8YF,2025-12-29,1133.39,1133.39,historico_original_codigo,,,,,,
-CDB925FEROD,2026-04-06,2192.06,2192.25,anexo_2026_04_08,5446936.0,2031-09-29,Inferido por vencimento único no anexo de posição.,,,
-CDB925FEROP,2026-03-13,941.65,941.65,posicao_detalhada_2026_04_08,,2030-09-30,venc=2030-09-30; qty=1.0; pu=953.05; score=14,alta,CDB BANCO DIGIMAIS S.A. - SET/2030,DI
-CDBA230L1S1,2026-03-02,1226.09,1226.09,historico_original_codigo,,,,,,
-CDBA232WJNF,2026-02-26,2812.21,2812.21,historico_original_codigo,,,,,,
-CDBA238CASY,2026-01-08,1239.33,1239.33,historico_original_codigo,,,,,,
-CDBA238W0QR,2026-01-08,1238.31,1238.31,historico_original_codigo,,,,,,
-CDBA238W0QV,2026-01-09,21085.97,21085.97,historico_original_codigo,,,,,,
-CDBA244SR5T,2026-03-25,36685.95,36685.95,historico_original_codigo,,,,,,
-CDBA252SABL,2026-04-06,47.16,47.17,anexo_2026_04_08,5446970.0,2031-10-02,Inferido por vencimento único no anexo de posição.,,,
-CDBA253IKMS,2026-04-06,906.29,906.37,anexo_2026_04_08,5447034.0,2031-10-06,Inferido por vencimento único no anexo de posição.,,,
-CDBA25CH5M8,2026-03-26,58688.7,58688.7,historico_original_codigo,,,,,,
-CDBA25DG6RD,2026-04-06,4479.71,4480.09,anexo_2026_04_08,5446966.0,2031-10-27,Inferido por vencimento único no anexo de posição.,,,
-CDBB253NGRO,2026-03-13,955.95,955.95,posicao_detalhada_2026_04_08,,2029-11-05,venc=2029-11-05; qty=1.0; pu=967.53; score=14,alta,CDB BANCO DIGIMAIS S.A. - NOV/2029,DI
-CDBC248TNLD,2026-03-06,2339.38,2339.38,historico_original_codigo,,,,,,
-CDBC252UEZA,2025-12-03,5130.0,5130.0,historico_original_codigo,,,,,,
-CDBC252UEZA,2025-12-03,99770.0,99770.0,historico_original_codigo,,,,,,
-CDBC25B85RV,2026-04-06,28695.95,28698.33,anexo_2026_04_08,5447031.0,2031-12-22,Inferido por vencimento compartilhado; alocado ao segundo código de 22/12/2031.,,,
-CDBC25C90XF,2026-03-30,29982.26,29982.26,historico_original_codigo,,,,,,
-CRA,2026-02-04,1340.35,1340.35,historico_original_codigo,,,,,,
-CRA019000GT,2025-12-12,1437.63,1437.63,historico_original_codigo,,,,,,
-CRA0190066O,2025-12-15,1262.45,1262.45,historico_original_codigo,,,,,,
-CRA022008C2,2025-12-15,1028.99,1028.99,historico_original_codigo,,,,,,
-CRA02300B9L,2025-12-12,1072.15,1072.15,historico_original_codigo,,,,,,
+codigo,corretora_origem,data_primeira_aquisicao,data_ultima_aquisicao,valor_aquisicao_total,custo_aquisicao_total,lotes,confirmado_por_anexo,fontes,produto_origem,indexador_origem,observacoes
+21A00390271,,2026-04-07,2026-04-07,146.4,146.4,1,False,posicao_detalhada_2026_04_08,LCI BANCO SANTANDER SA - JUL/2026,PREFIXADO,
+21B00071725,,2026-04-01,2026-04-01,2760.98,2760.98,1,False,posicao_detalhada_2026_04_08,LCA BTG PACTUAL - FEV/2027,PREFIXADO,
+21C00573069,,2026-04-01,2026-04-01,5710.0,5710.0,1,False,posicao_detalhada_2026_04_08,LCA BTG PACTUAL - MAR/2027,PREFIXADO,
+21J00652572,,2026-04-01,2026-04-01,1522.59,1522.59,1,False,posicao_detalhada_2026_04_08,LCA BTG PACTUAL - OUT/2026,PREFIXADO,
+21J00680410,,2026-04-01,2026-04-01,3070.41,3070.41,1,False,posicao_detalhada_2026_04_08,LCA BTG PACTUAL - OUT/2026,PREFIXADO,
+22A00698268,,2026-04-07,2026-04-07,2469.04,2469.04,1,False,posicao_detalhada_2026_04_08,LCA BTG PACTUAL - JAN/2032,IPCA,
+23K02257805,,2026-03-25,2026-03-25,7931.81,7931.81,1,False,posicao_detalhada_2026_04_08,LCA BANCO CNH CAPITAL S/A - NOV/2028,DI,
+23K02257805,BTG Pactual,2026-02-24,2026-02-24,1306.8,1306.8,1,True,posicao_detalhada_2026_04_08,LCA BANCO CNH CAPITAL S/A - NOV/2028,DI,Lote também aparece como depósito de custódia no BTG em 2026-03-02.
+24F02001983,BTG Pactual,2026-02-24,2026-02-24,2456.12,2456.12,1,True,extrato_btg_mar_2026,LCA | BANCO ORIGINAL S/A,DI,Confirmado pelo detalhamento do BTG (mar/2026).
+24F02320837,,2026-03-25,2026-03-25,19601.13,19601.13,1,False,historico_original_codigo,,,
+24G02045774,,2026-03-25,2026-03-25,7300.9,7300.9,1,False,historico_original_codigo,,,
+24H01458355,BTG Pactual,2026-03-02,2026-03-02,12093.13,12093.13,1,True,extrato_btg_mar_2026,LCA | BANCO CNH INDUSTRIAL CAPITAL S.A.,DI,Data corresponde ao depósito de custódia no BTG; ativo retirado no mesmo mês.
+24J04156377,BTG Pactual,2026-03-02,2026-03-02,2370.77,2370.77,1,True,extrato_btg_mar_2026,LCA | BANCO ORIGINAL S/A,DI,Data corresponde ao depósito de custódia no BTG; ativo vendido no mesmo mês.
+24J04931226,BTG Pactual,2026-03-02,2026-03-02,11797.7,11797.7,1,True,extrato_btg_mar_2026,LCA | BANCO ORIGINAL S/A,DI,Data corresponde ao depósito de custódia no BTG; ativo vendido no mesmo mês.
+24J04993393,,2026-04-07,2026-04-07,10185.21,10185.21,1,False,posicao_detalhada_2026_04_08,LCA BANCO BV S/A - JURO MENSAL - OUT/2026,PREFIXADO,
+25A02306041,,2025-12-10,2025-12-10,4496.85,4496.85,1,False,historico_original_codigo,,,
+25A02529513,,2025-12-11,2025-12-11,1123.82,1123.82,1,False,historico_original_codigo,,,
+25A02788785,,2025-12-04,2025-12-04,7848.26,7848.26,1,False,historico_original_codigo,,,
+25A02788791,,2025-12-12,2025-12-12,7827.97,7827.97,1,False,historico_original_codigo,,,
+25B02178918,,2025-12-11,2025-12-11,55608.8,55608.8,1,False,historico_original_codigo,,,
+25C03943216,,2025-12-10,2025-12-10,64689.88,64689.88,1,False,historico_original_codigo,,,
+25C04602211,,2026-03-31,2026-03-31,98.0,98.0,1,False,posicao_detalhada_2026_04_08,LCA BANCO BV S/A - JURO MENSAL - MAR/2029,PREFIXADO,
+25G04173307,,2026-03-31,2026-03-31,1195.53,1195.53,1,False,posicao_detalhada_2026_04_08,LCA BANCO BV S/A - ABR/2026,PREFIXADO,
+25H00071686\r,,2025-12-08,2025-12-08,11427.21,11427.21,1,False,historico_original_codigo,,,
+25H03632582,,2026-03-10,2026-03-10,2053.78,2053.78,1,False,posicao_detalhada_2026_04_08,LCI BARI HIPOTECARIA - AGO/2028,PREFIXADO,
+25I02737629,BTG Pactual,2026-03-02,2026-03-02,2082.14,2082.14,1,True,extrato_btg_mar_2026,LCI | BRB BANCO DE BRASILIA S.A.,DI,Data corresponde ao depósito de custódia no BTG; pode não ser a data original da compra.
+25I03347120,,2025-12-09,2025-12-09,130605.54000000001,130605.54000000001,2,False,historico_original_codigo | posicao_detalhada_2026_04_08,LCI BRB - SET/2026,DI,
+25I03347120,BTG Pactual,2026-03-02,2026-03-02,10203.55,10203.55,1,True,extrato_btg_mar_2026,LCI | BRB BANCO DE BRASILIA S.A.,DI,Data corresponde ao depósito de custódia no BTG; pode não ser a data original da compra.
+25J02757799,,2026-03-31,2026-03-31,526.99,526.99,1,False,posicao_detalhada_2026_04_08,LCA BANCO BV S/A - ABR/2026,PREFIXADO,
+25J02848707,,2026-04-07,2026-04-07,2111.67,2111.67,1,False,posicao_detalhada_2026_04_08,LCA BANCO BV S/A - ABR/2026,PREFIXADO,
+25J04674430,,2025-10-28,2025-10-28,172700.0,172700.0,4,False,historico_original_codigo | posicao_detalhada_2026_04_08,LCI BRB - OUT/2026,DI,
+25K01661876,BTG Pactual,2026-03-02,2026-03-02,5117.99,5117.99,1,True,extrato_btg_mar_2026,LCI | BRB BANCO DE BRASILIA S.A.,DI,Data corresponde ao depósito de custódia no BTG; pode não ser a data original da compra.
+25K02742867,BTG Pactual,2026-02-23,2026-02-23,2070.72,2070.72,1,True,extrato_btg_mar_2026,LCA | BANCO ORIGINAL S/A,DI,Confirmado pelo detalhamento do BTG (mar/2026).
+25K02828431,BTG Pactual,2026-02-13,2026-02-13,1019.67,1019.67,1,True,posicao_detalhada_2026_04_08,LCI BRB - NOV/2027,DI,Lote também aparece como depósito de custódia no BTG em 2026-03-02.
+25L00519473,,2025-12-03,2025-12-03,18000.0,18000.0,1,False,posicao_detalhada_2026_04_08,LCI BANCO BARI DE INVESTIMENT - DEZ/2027,DI,
+25L00519480,,2025-12-03,2025-12-03,8000.0,8000.0,1,False,posicao_detalhada_2026_04_08,LCI BANCO BARI DE INVESTIMENT - DEZ/2028,DI,
+25L00519482,,2025-12-03,2025-12-03,4000.0,4000.0,1,False,posicao_detalhada_2026_04_08,LCI BANCO BARI DE INVESTIMENT - DEZ/2029,DI,
+25L03388979,BTG Pactual,2026-02-23,2026-02-23,1022.59,1022.59,1,True,extrato_btg_mar_2026,LCA | BANCO ORIGINAL S/A,DI,Confirmado pelo detalhamento do BTG (mar/2026).
+CDB124C2KA1,,2026-01-06,2026-01-06,2514.33,2514.33,1,False,historico_original_codigo,,,
+CDB1268NKX4,,2026-04-06,2026-04-06,2680.49,2680.72,1,False,anexo_2026_04_08,,,
+CDB222OOJ0S,BTG Pactual,2026-01-14,2026-01-14,54562.649999999994,54562.649999999994,2,True,extrato_btg_mar_2026,CDB | WILL FINANCEIRA,DI,Lote 1/2 confirmado pelo detalhamento do BTG (mar/2026). | Lote 2/2 confirmado pelo detalhamento do BTG (mar/2026).
+CDB2234LOBB,,2026-01-26,2026-01-26,31059.84,31059.84,1,False,historico_original_codigo,,,
+CDB2247JHUV,,2026-01-06,2026-01-06,2327.68,2327.68,1,False,historico_original_codigo,,,
+CDB2261OZ94,,2026-04-07,2026-04-07,1234.16,1234.2,1,False,anexo_2026_04_08,,,
+CDB322OGG24,BTG Pactual,2026-01-13,2026-01-13,9532.31,9532.31,1,True,historico_original_codigo,CDB | WILL FINANCEIRA,DI,Confirmado pelo extrato BTG mar/2026.
+CDB3241KUET,BTG Pactual,2026-02-12,2026-02-12,32.58,32.58,1,True,extrato_btg_mar_2026,CDB | BANCO BMG S.A.,PREFIXADO,Confirmado pelo detalhamento do BTG (mar/2026).
+CDB3249ITIX,,2025-12-29,2025-12-29,8568.19,8568.19,1,False,historico_original_codigo,,,
+CDB324DLNKL,,2025-12-24,2025-12-24,11193.94,11193.94,1,False,historico_original_codigo,,,
+CDB3255H9FH,BTG Pactual,2026-01-16,2026-01-16,5228.27,5228.27,1,True,historico_original_codigo,CDB | WILL FINANCEIRA,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDB3256HA12,BTG Pactual,2026-03-24,2026-03-24,19780.06,19780.06,1,True,historico_original_codigo,CDB | BANCO DIGIMAIS S.A.,PREFIXADO,Data ajustada de 2026-03-25 para 2026-03-24 com base no extrato BTG de mar/2026. | Confirmado pelo extrato BTG mar/2026.
+CDB325C2TBT,,2026-03-18,2026-03-18,3352.03,3352.03,1,False,historico_original_codigo,,,
+CDB325C2TBT,BTG Pactual,2026-03-02,2026-03-02,5545.11,5545.11,1,True,extrato_btg_mar_2026,CDB | BANCO DIGIMAIS S.A.,PREFIXADO,Confirmado pelo detalhamento do BTG (mar/2026).
+CDB4216TIXP,BTG Pactual,2026-01-15,2026-01-15,31731.55,31731.55,1,True,historico_original_codigo,CDB | WILL FINANCEIRA,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDB422F0AJL,BTG Pactual,2026-03-03,2026-03-03,1471.9,1471.9,1,True,historico_original_codigo,CDB | BANCO BMG S.A.,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDB42461DLX,,2026-01-14,2026-01-14,1181.12,1181.12,1,False,historico_original_codigo,,,
+CDB42483IKK,,2025-12-16,2025-12-16,13179.22,13179.22,1,False,historico_original_codigo,,,
+CDB4250RI74,BTG Pactual,2026-03-10,2026-03-10,2210.75,2210.75,1,True,historico_original_codigo,CDB | BANCO AGIBANK S.A.,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDB4251NURF,BTG Pactual,2026-02-27,2026-02-27,10190.16,10190.16,1,True,historico_original_codigo,CDB | BANCO AGIBANK S.A.,DI,Confirmado pelo extrato BTG mar/2026.
+CDB4254QFY1,,2026-03-23,2026-03-23,9770.46,9770.46,1,False,posicao_detalhada_2026_04_08,CDB BANCO DIGIMAIS S.A. - ABR/2030,PREFIXADO,
+CDB425718JW,,2026-03-19,2026-03-19,1088.49,1088.49,1,False,posicao_detalhada_2026_04_08,CDB BANCO DIGIMAIS S.A. - ABR/2030,PREFIXADO,
+CDB4259FZ4J,,2026-04-06,2026-04-06,7.56,7.57,1,False,anexo_2026_04_08,,,
+CDB425A5P8W,,2026-04-06,2026-04-06,7.55,7.56,1,False,anexo_2026_04_08,,,
+CDB425A5P9D,,2026-03-18,2026-03-18,2156.39,2156.39,1,False,historico_original_codigo,,,
+CDB5242VF5V,BTG Pactual,2026-03-17,2026-03-17,10315.78,10315.78,1,True,extrato_btg_mar_2026,CDB | BANCO C6 CONSIGNADO S.A.,PREFIXADO,Confirmado pelo detalhamento do BTG (mar/2026).
+CDB5249B4DW,BTG Pactual,2026-03-16,2026-03-16,2150.59,2150.59,1,True,historico_original_codigo,CDB | BANCO BMG S.A.,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDB6245943T,,2026-01-21,2026-01-21,13334.6,13334.6,1,False,historico_original_codigo,,,
+CDB7248Z3TO,,2026-01-22,2026-01-22,35293.42,35293.42,1,False,historico_original_codigo,,,
+CDB7249F92D,,2025-12-16,2025-12-16,11766.49,11766.49,1,False,historico_original_codigo,,,
+CDB7249F95I,BTG Pactual,2026-03-20,2026-03-20,1141.13,1141.13,1,True,historico_original_codigo,CDB | PICPAY BANK,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDB8241YTM1,,2026-04-06,2026-04-06,1.21,1.21,1,False,anexo_2026_04_08,,,
+CDB9242Q8YF,BTG Pactual,2025-12-29,2025-12-29,1133.39,1133.39,1,True,historico_original_codigo,CDB | WILL FINANCEIRA,DI,Confirmado pelo extrato BTG mar/2026.
+CDB925FEROD,,2026-04-06,2026-04-06,2192.06,2192.25,1,False,anexo_2026_04_08,,,
+CDB925FEROP,,2026-03-13,2026-03-13,941.65,941.65,1,False,posicao_detalhada_2026_04_08,CDB BANCO DIGIMAIS S.A. - SET/2030,DI,
+CDBA230L1S1,BTG Pactual,2026-03-02,2026-03-02,1226.09,1226.09,1,True,historico_original_codigo,CDB | BANCO C6 CONSIGNADO S.A.,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDBA232WJNF,BTG Pactual,2026-02-26,2026-02-26,2812.21,2812.21,1,True,historico_original_codigo,CDB | CARUANA S/A,DI,Confirmado pelo extrato BTG mar/2026.
+CDBA238CASY,,2026-01-08,2026-01-08,1239.33,1239.33,1,False,historico_original_codigo,,,
+CDBA238W0QR,,2026-01-08,2026-01-08,1238.31,1238.31,1,False,historico_original_codigo,,,
+CDBA238W0QV,,2026-01-09,2026-01-09,21085.97,21085.97,1,False,historico_original_codigo,,,
+CDBA244SR5T,BTG Pactual,2026-03-25,2026-03-25,36685.95,36685.95,1,True,historico_original_codigo,CDB | PICPAY BANK,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDBA252SABL,,2026-04-06,2026-04-06,47.16,47.17,1,False,anexo_2026_04_08,,,
+CDBA253IKMS,,2026-04-06,2026-04-06,906.29,906.37,1,False,anexo_2026_04_08,,,
+CDBA25CH5M8,BTG Pactual,2026-03-26,2026-03-26,58688.7,58688.7,1,True,historico_original_codigo,CDB | BANCO DIGIMAIS S.A.,DI,Confirmado pelo extrato BTG mar/2026.
+CDBA25DG6RD,,2026-04-06,2026-04-06,4479.71,4480.09,1,False,anexo_2026_04_08,,,
+CDBB249I7JD,BTG Pactual,2025-12-18,2025-12-19,91.03,91.03,2,True,extrato_btg_mar_2026,CDB | WILL FINANCEIRA,DI,Lote 1/2 confirmado pelo detalhamento do BTG (mar/2026). | Lote 2/2 confirmado pelo detalhamento do BTG (mar/2026).
+CDBB253NGRO,,2026-03-13,2026-03-13,955.95,955.95,1,False,posicao_detalhada_2026_04_08,CDB BANCO DIGIMAIS S.A. - NOV/2029,DI,
+CDBC243R809,BTG Pactual,2025-12-18,2025-12-18,1.14,1.14,1,True,extrato_btg_mar_2026,CDB | WILL FINANCEIRA,DI,Confirmado pelo detalhamento do BTG (mar/2026).
+CDBC245VMVU,BTG Pactual,2025-12-18,2025-12-18,1.12,1.12,1,True,extrato_btg_mar_2026,CDB | WILL FINANCEIRA,DI,Confirmado pelo detalhamento do BTG (mar/2026).
+CDBC248TNLD,BTG Pactual,2026-03-06,2026-03-06,2339.38,2339.38,1,True,historico_original_codigo,CDB | PICPAY BANK,PREFIXADO,Confirmado pelo extrato BTG mar/2026.
+CDBC252UEZA,,2025-12-03,2025-12-03,104900.0,104900.0,2,False,historico_original_codigo,,,
+CDBC25B85RV,,2026-04-06,2026-04-06,28695.95,28698.33,1,False,anexo_2026_04_08,,,
+CDBC25C90XF,BTG Pactual,2026-03-30,2026-03-30,29982.26,29982.26,1,True,historico_original_codigo,CDB | BANCO DIGIMAIS S.A.,DI,Confirmado pelo extrato BTG mar/2026.
+CRA019000GT,,2025-12-12,2025-12-12,1437.63,1437.63,1,False,historico_original_codigo,,,
+CRA0190066O,BTG Pactual,2025-12-15,2025-12-15,1262.45,1262.45,1,True,historico_original_codigo,CRA | ADECOAGRO,IPCA,Confirmado pelo extrato BTG mar/2026.
+CRA021000M9,BTG Pactual,2026-02-04,2026-02-04,1340.35,1340.35,1,True,historico_original_codigo,CRA | CERRADINHO BIOENERGIA,IPCA,Código genérico CRA substituído por CRA021000M9 com base no extrato BTG de mar/2026. | Lote também aparece como depósito de custódia no BTG em 2026-03-02.
+CRA022008C2,,2025-12-15,2025-12-15,1028.99,1028.99,1,False,historico_original_codigo,,,
+CRA022008C2,BTG Pactual,2025-12-15,2025-12-15,973.24,973.24,1,True,extrato_btg_mar_2026,CRA | VICUNHA,DI,Confirmado pelo detalhamento do BTG (mar/2026).
+CRA02300B9L,,2025-12-12,2025-12-12,1072.15,1072.15,1,False,historico_original_codigo,,,
