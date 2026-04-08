@@ -55,6 +55,7 @@
       color: var(--text);
       width: 100%;
     }
+    select[multiple] { min-height: 150px; }
     input[type="file"]::file-selector-button {
       border: 0; background: var(--accent); color: #fff; padding: 8px 12px; border-radius: 10px; margin-right: 10px; cursor: pointer;
     }
@@ -79,6 +80,7 @@
     th, td { padding: 11px 10px; border-bottom: 1px solid var(--border); font-size: 14px; text-align: left; }
     th { position: sticky; top: 0; background: #0f1733; color: #cfe0ff; cursor: pointer; }
     td.right { text-align: right; font-variant-numeric: tabular-nums; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
     .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
   </style>
 </head>
@@ -142,9 +144,9 @@
         </div>
       </div>
       <div class="grid grid-2" style="margin-top: 14px;">
-        <div class="checkbox-row">
-          <input id="ignorarVencimento" type="checkbox" />
-          <label for="ignorarVencimento">Projetar sem levar em conta o vencimento</label>
+        <div class="field">
+          <label>Hipóteses de projeção</label>
+          <div class="note">O painel sempre mostrará duas projeções: <strong>com vencimento</strong> e <strong>sem vencimento</strong>.</div>
         </div>
         <div class="checkbox-row">
           <input id="usarCsvIpca" type="checkbox" checked />
@@ -179,15 +181,13 @@
         </div>
         <div class="field">
           <label for="emissorIncluir">Emissor - incluir</label>
-          <select id="emissorIncluir">
-            <option value="">Todos</option>
-          </select>
+          <select id="emissorIncluir" multiple size="6"></select>
+          <div class="hint">Selecione um ou vários emissores para manter no painel.</div>
         </div>
         <div class="field">
           <label for="emissorExcluir">Emissor - excluir</label>
-          <select id="emissorExcluir">
-            <option value="">Nenhum</option>
-          </select>
+          <select id="emissorExcluir" multiple size="6"></select>
+          <div class="hint">Selecione um ou vários emissores para remover do painel.</div>
         </div>
       </div>
       <div class="grid grid-3" style="margin-top: 14px;">
@@ -197,7 +197,8 @@
             <option value="Produto painel">Produto</option>
             <option value="Emissor painel">Emissor</option>
             <option value="Valor Atualizado CURVA">Valor na curva</option>
-            <option value="Valor projetado painel">Valor projetado</option>
+            <option value="Valor projetado com vencimento">Valor projetado com vencimento</option>
+            <option value="Valor projetado sem vencimento">Valor projetado sem vencimento</option>
             <option value="Taxa painel">Taxa</option>
           </select>
         </div>
@@ -210,7 +211,7 @@
         </div>
         <div class="field">
           <label>&nbsp;</label>
-          <div class="note">O CSV opcional <code>compras_secundario.csv</code> deve ter: <code>codigo,data_aquisicao,valor_aquisicao</code>.</div>
+          <div class="note">Nos filtros de emissor, use <strong>Ctrl</strong> ou <strong>Cmd</strong> para múltipla seleção. O CSV opcional <code>compras_secundario.csv</code> deve ter: <code>codigo,data_aquisicao,valor_aquisicao</code>.</div>
         </div>
       </div>
     </section>
@@ -252,7 +253,8 @@
       'Vencimento painel',
       'Taxa painel',
       'Valor Atualizado CURVA',
-      'Valor projetado painel',
+      'Valor projetado com vencimento',
+      'Valor projetado sem vencimento',
       'Data aquisição',
       'Valor aquisição',
       'Taxa compra secundário'
@@ -260,7 +262,8 @@
 
     const numericCols = new Set([
       'Valor Atualizado CURVA',
-      'Valor projetado painel',
+      'Valor projetado com vencimento',
+      'Valor projetado sem vencimento',
       'Valor aquisição'
     ]);
 
@@ -271,7 +274,6 @@
       tipoProjecao: document.getElementById('tipoProjecao'),
       cdiFuturo: document.getElementById('cdiFuturo'),
       ipcaFuturo: document.getElementById('ipcaFuturo'),
-      ignorarVencimento: document.getElementById('ignorarVencimento'),
       usarCsvIpca: document.getElementById('usarCsvIpca'),
       btnProcessar: document.getElementById('btnProcessar'),
       btnExportar: document.getElementById('btnExportar'),
@@ -544,7 +546,7 @@
       const indexador = row.Indexador;
       const taxaValor = row.__taxaValor;
       const dataRef = row['Data ref CDI'];
-      let futureDate = addMonths(dataRef, horizonteMeses);
+      const futureDate = addMonths(dataRef, horizonteMeses);
       if (!ignoreMaturity && row.Vencimento && new Date(futureDate) > new Date(row.Vencimento)) return NaN;
       if (!Number.isFinite(currentPU) || !Number.isFinite(qty)) return NaN;
       let futurePU = NaN;
@@ -593,7 +595,6 @@
       const cdiAnnualRef = cdi.find(r => r.data === cdiRef)?.taxa_anual_percentual;
       const horizon = Number(el.tipoProjecao.value || 12);
       state.horizonteMeses = horizon;
-      const ignoreMaturity = el.ignorarVencimento.checked;
       const cdiFuture = parseNumero(el.cdiFuturo.value);
       const ipcaFuture = parseNumero(el.ipcaFuturo.value);
 
@@ -611,6 +612,10 @@
         const est = estimatePrimaryRate(row.Indexador, unit, row['Preço Atualizado CURVA'], row['Data de Emissão'], cdiRef, histCdi, histIpca);
         const compra = comprasMap.get(String(row['Código'] ?? '').trim());
 
+        const rowBase = { ...row, '__taxaValor': est.taxaValor, 'Data ref CDI': cdiRef };
+        const valorComVenc = projectValue(rowBase, horizon, cdiFuture, ipcaFuture, false);
+        const valorSemVenc = projectValue(rowBase, horizon, cdiFuture, ipcaFuture, true);
+
         const base = {
           ...row,
           'Produto painel': row[colProduto] ?? row['Código'] ?? '-',
@@ -621,10 +626,11 @@
           'CDI ref anual': cdiAnnualRef,
           'Taxa painel': est.taxa,
           '__taxaValor': est.taxaValor,
-          'Valor projetado painel': projectValue({ ...row, '__taxaValor': est.taxaValor, 'Data ref CDI': cdiRef }, horizon, cdiFuture, ipcaFuture, ignoreMaturity),
+          'Valor projetado com vencimento': valorComVenc,
+          'Valor projetado sem vencimento': valorSemVenc,
           'Data aquisição': compra?.data_aquisicao ?? null,
           'Valor aquisição': compra?.valor_aquisicao ?? NaN,
-          'Taxa compra secundário': estimateSecondaryRate({ ...row, '__taxaValor': est.taxaValor, 'Data ref CDI': cdiRef }, compra, cdi, ipca)
+          'Taxa compra secundário': estimateSecondaryRate(rowBase, compra, cdi, ipca)
         };
         results.push(base);
       }
@@ -634,8 +640,8 @@
     function populateFilters(rows) {
       const emissores = [...new Set(rows.map(r => r['Emissor painel']).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b), 'pt-BR'));
       const indexadores = [...new Set(rows.map(r => r.Indexador).filter(Boolean))].sort();
-      el.emissorIncluir.innerHTML = '<option value="">Todos</option>' + emissores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
-      el.emissorExcluir.innerHTML = '<option value="">Nenhum</option>' + emissores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+      el.emissorIncluir.innerHTML = emissores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+      el.emissorExcluir.innerHTML = emissores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
       el.indexadorFiltro.innerHTML = '<option value="">Todos</option>' + indexadores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
     }
 
@@ -647,12 +653,16 @@
       return String(a ?? '').localeCompare(String(b ?? ''), 'pt-BR');
     }
 
+    function selectedValues(selectEl) {
+      return Array.from(selectEl.selectedOptions || []).map(o => o.value).filter(Boolean);
+    }
+
     function applyFilters() {
       let rows = [...state.results];
       const busca = (el.busca.value || '').toLowerCase().trim();
       const idx = el.indexadorFiltro.value || '';
-      const inc = el.emissorIncluir.value || '';
-      const exc = el.emissorExcluir.value || '';
+      const includeSet = new Set(selectedValues(el.emissorIncluir));
+      const excludeSet = new Set(selectedValues(el.emissorExcluir));
       const ord = el.ordenarPor.value;
       const dir = el.direcaoOrdenacao.value === 'desc' ? -1 : 1;
 
@@ -660,8 +670,8 @@
         rows = rows.filter(r => [r['Produto painel'], r['Código'], r['Emissor painel'], r['Produto']].some(v => String(v ?? '').toLowerCase().includes(busca)));
       }
       if (idx) rows = rows.filter(r => r.Indexador === idx);
-      if (inc) rows = rows.filter(r => String(r['Emissor painel'] ?? '') === inc);
-      if (exc) rows = rows.filter(r => String(r['Emissor painel'] ?? '') !== exc);
+      if (includeSet.size) rows = rows.filter(r => includeSet.has(String(r['Emissor painel'] ?? '')));
+      if (excludeSet.size) rows = rows.filter(r => !excludeSet.has(String(r['Emissor painel'] ?? '')));
 
       rows.sort((a,b) => compareValues(a[ord], b[ord]) * dir);
       state.filtered = rows;
@@ -674,14 +684,23 @@
     }
 
     function renderSummary(rows) {
-      const sumCurva = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor Atualizado CURVA']) ? r['Valor Atualizado CURVA'] : 0), 0);
-      const sumProj = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor projetado painel']) ? r['Valor projetado painel'] : 0), 0);
-      const sumAquis = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor aquisição']) ? r['Valor aquisição'] : 0), 0);
+      const sumCurvaTotal = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor Atualizado CURVA']) ? r['Valor Atualizado CURVA'] : 0), 0);
+      const rowsWithCompra = rows.filter(r => Number.isFinite(r['Valor aquisição']));
+      const sumAquis = rowsWithCompra.reduce((a,r)=>a + r['Valor aquisição'], 0);
+      const sumCurvaComparable = rowsWithCompra.reduce((a,r)=>a + (Number.isFinite(r['Valor Atualizado CURVA']) ? r['Valor Atualizado CURVA'] : 0), 0);
+      const diffAbs = sumCurvaComparable - sumAquis;
+      const diffPct = sumAquis > 0 ? (sumCurvaComparable / sumAquis - 1) * 100 : NaN;
+      const sumProjCom = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor projetado com vencimento']) ? r['Valor projetado com vencimento'] : 0), 0);
+      const sumProjSem = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor projetado sem vencimento']) ? r['Valor projetado sem vencimento'] : 0), 0);
       el.summaryGrid.innerHTML = [
         metric('Ativos no filtro', String(rows.length), 'Quantidade exibida no painel'),
-        metric('Valor na curva', `R$ ${fmtNum(sumCurva)}`, 'Soma do recorte filtrado'),
-        metric(`Valor projetado ${state.horizonteMeses}m`, `R$ ${fmtNum(sumProj)}`, 'Usando as taxas futuras informadas'),
-        metric('Valor de aquisição conhecido', `R$ ${fmtNum(sumAquis)}`, 'Com base em compras_secundario.csv')
+        metric('Valor na curva total', `R$ ${fmtNum(sumCurvaTotal)}`, 'Soma de todo o recorte filtrado'),
+        metric('Valor de aquisição conhecido', `R$ ${fmtNum(sumAquis)}`, 'Somente ativos com compras_secundario.csv'),
+        metric('Valor na curva comparável', `R$ ${fmtNum(sumCurvaComparable)}`, 'Apenas ativos com valor de aquisição conhecido'),
+        metric('Diferença absoluta', `R$ ${fmtNum(diffAbs)}`, 'Curva comparável menos valor de aquisição'),
+        metric('Diferença percentual', Number.isFinite(diffPct) ? `${fmtNum(diffPct)}%` : '-', 'Sobre o total adquirido conhecido'),
+        metric(`Projeção ${state.horizonteMeses}m com vencimento`, `R$ ${fmtNum(sumProjCom)}`, 'Considera títulos vencidos como fora da projeção'),
+        metric(`Projeção ${state.horizonteMeses}m sem vencimento`, `R$ ${fmtNum(sumProjSem)}`, 'Ignora a data de vencimento')
       ].join('');
       el.summarySection.classList.remove('hidden');
     }
@@ -720,8 +739,8 @@
       el.arquivoPosicao.value = '';
       el.busca.value = '';
       el.indexadorFiltro.innerHTML = '<option value="">Todos</option>';
-      el.emissorIncluir.innerHTML = '<option value="">Todos</option>';
-      el.emissorExcluir.innerHTML = '<option value="">Nenhum</option>';
+      el.emissorIncluir.innerHTML = '';
+      el.emissorExcluir.innerHTML = '';
       el.summarySection.classList.add('hidden');
       el.filtersSection.classList.add('hidden');
       el.tableSection.classList.add('hidden');
