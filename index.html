@@ -302,7 +302,7 @@ function chooseFaceValue(currentPrice){
   if (!Number.isFinite(currentPrice)) return 1000;
   return cands.reduce((best,cur)=>Math.abs(cur-currentPrice)<Math.abs(best-currentPrice)?cur:best,cands[0]);
 }
-function chooseRefDate(series){
+function chooseLastCdiDate(series){
   const today = todayDateOnly();
   const eligible = series.filter(r => compareDateOnly(r.data, today) <= 0);
   return eligible.length ? eligible[eligible.length-1].data : (series.length ? series[series.length-1].data : null);
@@ -679,8 +679,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     el.btnProcessar.disabled = true;
     setStatus('Lendo planilha, séries e custos de aquisição...');
     const comprasInfoPromise = fetchFirstCsv([
-      './compras_secundario_posicoes_abertas_corretora_bari_corrigido.csv',
-      './compras_secundario_posicoes_abertas_corretora.csv'
+      './compras_secundario.csv'
     ]);
     const [{rows: posRows, actualSheet}, cdiRows, ipcaRows, comprasInfo] = await Promise.all([
       readExcel(el.arquivoPosicao.files[0], el.nomeAba.value.trim() || 'Renda Fixa'),
@@ -694,8 +693,9 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const dfIpca = prepareIpca(ipcaRows);
     const dfCompras = prepareCompras(comprasRows);
 
-    const refDate = chooseRefDate(dfCdi);
-    if (!refDate) throw new Error('Não foi possível definir a data de referência pela série CDI.');
+    const todayRef = todayDateOnly();
+    const cdiRefDate = chooseLastCdiDate(dfCdi);
+    if (!cdiRefDate) throw new Error('Não foi possível definir a data de referência da série CDI.');
 
     state.dfPosicaoRaw = dfPos;
     state.dfComprasRaw = dfCompras;
@@ -703,17 +703,18 @@ el.btnProcessar.addEventListener('click', async ()=>{
     state.dfCdi = dfCdi;
     state.dfIpca = dfIpca;
     state.dfCompras = dfCompras;
-    state.refDate = refDate;
+    state.refDate = todayRef;
+    state.cdiRefDate = cdiRefDate;
 
     const cdiFuture = toNumber(el.cdiFuturo.value);
     const ipcaFuture = toNumber(el.ipcaFuturo.value);
 
     const result = dfPos.filter(r => ['DI','PREFIXADO','IPCA'].includes(r['Indexador'])).map(row => {
-      const panelRate = estimatePanelRate(row, dfCdi, dfIpca, refDate);
+      const panelRate = estimatePanelRate(row, dfCdi, dfIpca, cdiRefDate);
       const acq = matchAcq(row['Código'], row['Instituição']);
       const secRate = estimateSecondaryRate(row, acq, dfCdi, dfIpca);
-      const v12Mat = project12m(row, panelRate, refDate, cdiFuture, ipcaFuture, true);
-      const v12NoMat = project12m(row, panelRate, refDate, cdiFuture, ipcaFuture, false);
+      const v12Mat = project12m(row, panelRate, todayRef, cdiFuture, ipcaFuture, true);
+      const v12NoMat = project12m(row, panelRate, todayRef, cdiFuture, ipcaFuture, false);
       return {
         'Produto painel': row['Produto'],
         'Corretora painel': row['Instituição'],
@@ -742,7 +743,8 @@ el.btnProcessar.addEventListener('click', async ()=>{
     setStatus(
       `Processamento concluído.\n` +
       `Aba usada: ${actualSheet}\n` +
-      `Referência automática: ${formatDate(refDate)}\n` +
+      `Data do computador usada no painel: ${formatDate(todayRef)}\n` +
+      `Última data CDI disponível usada no cálculo histórico: ${formatDate(cdiRefDate)}\n` +
       `Linhas tratadas: ${result.length}\n` +
       `Compras casadas por código + corretora: ${result.filter(r => r['Custo aquisição'] > 0).length}`
     );
