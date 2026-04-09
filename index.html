@@ -101,12 +101,13 @@
       Envie a planilha de posição. O site usa automaticamente <code>serie_cdi.csv</code>,
       <code>serie_ipca.csv</code> e o arquivo <code>compras_secundario.csv</code> do repositório.
       Agora a data de referência pode ser definida pelo usuário, iniciando por padrão na data do dia.
-      O custo de aquisição continua sendo casado por <strong>código + corretora</strong>, e o painel também passa a mostrar a composição ponderada de <strong>prefixados x pós-fixados</strong> ao longo do tempo.
+      O custo de aquisição continua sendo casado por <strong>código + corretora</strong>, e o painel também passa a mostrar a composição ponderada de <strong>prefixados x pós-fixados</strong> ao longo do tempo, além de valores <strong>brutos e líquidos</strong> na posição e nas projeções.
     </p>
     <div>
       <span class="pill">Data de referência editável</span>
       <span class="pill">Match por código + corretora</span>
       <span class="pill">Composição ponderada ao longo do tempo</span>
+      <span class="pill">Bruto x líquido</span>
       <span class="pill">CSV de ativos sem custo</span>
     </div>
   </section>
@@ -136,7 +137,7 @@
           <input id="dataReferencia" type="date" />
           <button id="btnHoje" type="button" class="ghost">Hoje</button>
         </div>
-        <div class="helper-note">Usada para projeções, composição temporal e recorte histórico das séries.</div>
+        <div class="helper-note">Usada para projeções, composição temporal e recorte histórico das séries. Os valores líquidos usam essa data como referência de resgate, aplicando IR regressivo e IOF conforme o tipo do ativo.</div>
       </div>
       <div class="field">
         <label>Data do computador</label>
@@ -284,14 +285,18 @@ const state = {
 
 const TABLE_COLUMNS = [
   'Produto painel','Corretora painel','Emissor painel','Código','Indexador',
-  'Emissão painel','Vencimento painel','Taxa painel','Valor Atualizado CURVA',
+  'Emissão painel','Vencimento painel','Taxa painel',
+  'Valor Atualizado CURVA','Valor Atualizado CURVA líquido',
   'Data aquisição','Custo aquisição','PU aquisição','Taxa compra secundário',
-  'Valor projetado 12m com vencimento','Valor projetado 12m sem vencimento'
+  'Valor projetado 12m com vencimento','Valor projetado 12m com vencimento líquido',
+  'Valor projetado 12m sem vencimento','Valor projetado 12m sem vencimento líquido'
 ];
 
 const NUMERIC_COLUMNS = new Set([
-  'Valor Atualizado CURVA','Custo aquisição','PU aquisição',
-  'Valor projetado 12m com vencimento','Valor projetado 12m sem vencimento'
+  'Valor Atualizado CURVA','Valor Atualizado CURVA líquido',
+  'Custo aquisição','PU aquisição',
+  'Valor projetado 12m com vencimento','Valor projetado 12m com vencimento líquido',
+  'Valor projetado 12m sem vencimento','Valor projetado 12m sem vencimento líquido'
 ]);
 
 const MISSING_COST_HEADERS = [
@@ -446,6 +451,12 @@ function busdayCount(startObj,endObj){
     current.setDate(current.getDate()+1);
   }
   return count;
+}
+function calendarDaysBetween(startObj,endObj){
+  if (!startObj || !endObj) return NaN;
+  const start = new Date(startObj.y, startObj.m-1, startObj.d);
+  const end = new Date(endObj.y, endObj.m-1, endObj.d);
+  return Math.floor((end - start) / 86400000);
 }
 function normalizeBroker(v){
   const s = String(v ?? '').trim();
@@ -760,14 +771,71 @@ function project12m(row, panelRate, refDate, cdiFuturePct, ipcaFuturePct, consid
   }
   return projectionBase;
 }
+
+const IOF_REGRESSIVE_TABLE = {
+  1:0.96, 2:0.93, 3:0.90, 4:0.86, 5:0.83, 6:0.80, 7:0.76, 8:0.73, 9:0.70,
+  10:0.66, 11:0.63, 12:0.60, 13:0.56, 14:0.53, 15:0.50, 16:0.46, 17:0.43, 18:0.40,
+  19:0.36, 20:0.33, 21:0.30, 22:0.26, 23:0.23, 24:0.20, 25:0.16, 26:0.13, 27:0.10,
+  28:0.06, 29:0.03, 30:0
+};
+
+function normalizeTextTax(v){
+  return String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+}
+function getTaxProfile(row){
+  const text = normalizeTextTax([row['Produto painel'] || row['Produto'] || '', row['Código'] || ''].join(' '));
+  if (text.includes('LCA')) return { type:'LCA', hasIR:false, hasIOF:false };
+  if (text.includes('LCI')) return { type:'LCI', hasIR:false, hasIOF:true };
+  return { type:'OUTROS', hasIR:true, hasIOF:true };
+}
+function getIrRateByDays(daysHeld, hasAcquisitionDate){
+  if (!hasAcquisitionDate || !Number.isFinite(daysHeld)) return 0.225;
+  if (daysHeld <= 180) return 0.225;
+  if (daysHeld <= 360) return 0.20;
+  if (daysHeld <= 720) return 0.175;
+  return 0.15;
+}
+function getIofRateByDays(daysHeld){
+  if (!Number.isFinite(daysHeld)) return 0;
+  if (daysHeld >= 30) return 0;
+  if (daysHeld <= 0) return IOF_REGRESSIVE_TABLE[1];
+  const d = Math.max(1, Math.floor(daysHeld));
+  return IOF_REGRESSIVE_TABLE[d] ?? 0;
+}
+function estimateNetValue(grossValue, costValue, acquisitionDate, resgateDate, taxProfile){
+  if (!Number.isFinite(grossValue)) {
+    return { net: NaN, gross: NaN, gain: NaN, iofValue: NaN, irValue: NaN, totalTax: NaN, daysHeld: NaN, irRate: NaN, iofRate: NaN };
+  }
+  const cost = Number.isFinite(costValue) ? costValue : 0;
+  const gain = Math.max(0, grossValue - cost);
+  if (gain <= 0) {
+    return { net: grossValue, gross: grossValue, gain, iofValue: 0, irValue: 0, totalTax: 0, daysHeld: Number.isFinite(calendarDaysBetween(acquisitionDate, resgateDate)) ? calendarDaysBetween(acquisitionDate, resgateDate) : NaN, irRate: 0, iofRate: 0 };
+  }
+  const daysHeld = Number.isFinite(calendarDaysBetween(acquisitionDate, resgateDate)) ? calendarDaysBetween(acquisitionDate, resgateDate) : NaN;
+  const iofRate = taxProfile.hasIOF ? getIofRateByDays(daysHeld) : 0;
+  const iofValue = gain * iofRate;
+  const irRate = taxProfile.hasIR ? getIrRateByDays(daysHeld, !!acquisitionDate) : 0;
+  const irBase = Math.max(0, gain - iofValue);
+  const irValue = irBase * irRate;
+  const totalTax = iofValue + irValue;
+  const net = grossValue - totalTax;
+  return { net, gross: grossValue, gain, iofValue, irValue, totalTax, daysHeld, irRate, iofRate };
+}
 function aggregateTotals(rows){
   const totalCurve = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor Atualizado CURVA'])?r['Valor Atualizado CURVA']:0),0);
+  const totalCurveLiquid = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor Atualizado CURVA líquido'])?r['Valor Atualizado CURVA líquido']:0),0);
   const totalAq = rows.reduce((a,r)=>a+(Number.isFinite(r['Custo aquisição'])?r['Custo aquisição']:0),0);
   const diff = totalCurve - totalAq;
   const diffPct = totalAq ? diff/totalAq*100 : NaN;
+  const taxCurrent = totalCurve - totalCurveLiquid;
   const missingCost = rows.filter(r => !(Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0)).length;
   const duplicatedCodes = rows.filter(r => r['_codigoDuplicado']).length;
-  return { totalCurve, totalAq, diff, diffPct, missingCost, duplicatedCodes };
+  const projectedWith = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m com vencimento'])?r['Valor projetado 12m com vencimento']:0),0);
+  const projectedWithLiquid = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m com vencimento líquido'])?r['Valor projetado 12m com vencimento líquido']:0),0);
+  const projectedNo = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m sem vencimento'])?r['Valor projetado 12m sem vencimento']:0),0);
+  const projectedNoLiquid = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m sem vencimento líquido'])?r['Valor projetado 12m sem vencimento líquido']:0),0);
+  const conservativeIrRows = rows.filter(r => r['_taxConservativeIr']).length;
+  return { totalCurve, totalCurveLiquid, totalAq, diff, diffPct, taxCurrent, missingCost, duplicatedCodes, projectedWith, projectedWithLiquid, projectedNo, projectedNoLiquid, conservativeIrRows };
 }
 function card(label, value, sub=''){
   return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
@@ -778,13 +846,18 @@ function renderSummary(rows){
   const html = [
     card('Linhas no recorte', String(rows.length), `Data de referência solicitada: ${formatDate(state.refDateRequested)}`),
     card('Aquisição conhecida', `R$ ${brNumber(t.totalAq)}`, 'Somatório do custo de aquisição com fallback subsidiário por código quando não há match por corretora'),
-    card('Valor na curva', `R$ ${brNumber(t.totalCurve)}`, 'Somatório do valor atualizado na curva do recorte'),
-    card('Diferença absoluta', `R$ ${brNumber(t.diff)}`, 'Curva menos aquisição conhecida'),
+    card('Valor na curva', `R$ ${brNumber(t.totalCurve)}`, 'Somatório bruto do valor atualizado na curva do recorte'),
+    card('Valor na curva líquido', `R$ ${brNumber(t.totalCurveLiquid)}`, 'Valor líquido estimado na data de referência, após IR/IOF conforme o tipo do papel'),
+    card('Diferença absoluta', `R$ ${brNumber(t.diff)}`, 'Curva bruta menos aquisição conhecida'),
     card('Diferença percentual', brPct(t.diffPct), 'Diferença percentual sobre a aquisição conhecida'),
+    card('Tributação estimada hoje', `R$ ${brNumber(t.taxCurrent)}`, 'Diferença entre o valor bruto e o valor líquido na data de referência'),
     card('Sem custo informado', String(t.missingCost), 'Quantidade de ativos que podem ser exportados no CSV auxiliar'),
     card('Códigos duplicados', String(t.duplicatedCodes), 'Linhas do recorte com código repetido no painel'),
-    card('Projeção 12m com vencimento', `R$ ${brNumber(rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m com vencimento'])?r['Valor projetado 12m com vencimento']:0),0))}`, 'Projeção sobre o valor total atual das posições, limitada ao vencimento quando aplicável'),
-    card('Projeção 12m sem vencimento', `R$ ${brNumber(rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m sem vencimento'])?r['Valor projetado 12m sem vencimento']:0),0))}`, 'Projeção sobre o valor total atual das posições, sem truncar no vencimento')
+    card('IR conservador por falta de data', String(t.conservativeIrRows), 'Linhas em que, sem data de aquisição, foi usada a maior faixa de IR'),
+    card('Projeção 12m com vencimento', `R$ ${brNumber(t.projectedWith)}`, 'Projeção bruta sobre o valor total atual das posições, limitada ao vencimento quando aplicável'),
+    card('Projeção 12m com vencimento líquido', `R$ ${brNumber(t.projectedWithLiquid)}`, 'Projeção líquida considerando IR/IOF e o custo de aquisição'),
+    card('Projeção 12m sem vencimento', `R$ ${brNumber(t.projectedNo)}`, 'Projeção bruta sobre o valor total atual das posições, sem truncar no vencimento'),
+    card('Projeção 12m sem vencimento líquido', `R$ ${brNumber(t.projectedNoLiquid)}`, 'Projeção líquida considerando IR/IOF e o custo de aquisição')
   ].join('');
   el.sumario.innerHTML = html;
   el.sumario.classList.remove('hidden');
@@ -1201,9 +1274,21 @@ el.btnProcessar.addEventListener('click', async ()=>{
         });
         const acqMatch = matchAcq(row['Código'], row['Instituição'], row['Produto'], row['Emissor']);
         const acq = acqMatch.record;
+        const acquisitionDate = acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null;
+        const acquisitionCost = acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : 0;
+        const taxProfile = getTaxProfile({ 'Produto painel': row['Produto'], 'Código': row['Código'] });
         const secRate = estimateSecondaryRate(row, acq, dfCdi, dfIpca);
         const v12Mat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, true);
         const v12NoMat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, false);
+        const currentLiquidInfo = estimateNetValue(row['Valor Atualizado CURVA'], acquisitionCost, acquisitionDate, requestedRef, taxProfile);
+        const projectionWithEndDate = (() => {
+          let endDate = addMonthsDateOnly(requestedRef, 12);
+          if (row['Vencimento'] && compareDateOnly(row['Vencimento'], endDate) < 0) endDate = row['Vencimento'];
+          return endDate;
+        })();
+        const projectionNoEndDate = addMonthsDateOnly(requestedRef, 12);
+        const projectedWithLiquidInfo = estimateNetValue(v12Mat, acquisitionCost, acquisitionDate, projectionWithEndDate, taxProfile);
+        const projectedNoLiquidInfo = estimateNetValue(v12NoMat, acquisitionCost, acquisitionDate, projectionNoEndDate, taxProfile);
         const quantidadeBase = Number.isFinite(row['Quantidade Disponível']) ? row['Quantidade Disponível'] : row['Quantidade'];
         return {
           'Produto painel': row['Produto'],
@@ -1215,16 +1300,25 @@ el.btnProcessar.addEventListener('click', async ()=>{
           'Vencimento painel': row['Vencimento'],
           'Taxa painel': panelRate.label,
           'Valor Atualizado CURVA': row['Valor Atualizado CURVA'],
-          'Data aquisição': acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null,
-          'Custo aquisição': acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : 0,
+          'Valor Atualizado CURVA líquido': currentLiquidInfo.net,
+          'Data aquisição': acquisitionDate,
+          'Custo aquisição': acquisitionCost,
           'PU aquisição': acq && Number.isFinite(acq.pu_aquisicao_medio_aberto) ? acq.pu_aquisicao_medio_aberto : NaN,
           'Taxa compra secundário': secRate.label,
           'Valor projetado 12m com vencimento': v12Mat,
+          'Valor projetado 12m com vencimento líquido': projectedWithLiquidInfo.net,
           'Valor projetado 12m sem vencimento': v12NoMat,
+          'Valor projetado 12m sem vencimento líquido': projectedNoLiquidInfo.net,
           '_quantidadeBase': quantidadeBase,
           '_tipoComposicao': getFixType(row['Indexador']),
           '_origemValorAtualizado': row['_origemValorAtualizado'] || 'CURVA',
-          '_costMatchMode': acqMatch.mode
+          '_costMatchMode': acqMatch.mode,
+          '_taxType': taxProfile.type,
+          '_taxHasAcquisitionDate': !!acquisitionDate,
+          '_taxConservativeIr': taxProfile.hasIR && !acquisitionDate,
+          '_taxCurrent': currentLiquidInfo.totalTax,
+          '_taxProjectedWith': projectedWithLiquidInfo.totalTax,
+          '_taxProjectedNo': projectedNoLiquidInfo.totalTax
         };
       });
     const codeCounts = new Map();
@@ -1254,7 +1348,9 @@ el.btnProcessar.addEventListener('click', async ()=>{
 ` +
       `Ativos sem custo informado: ${result.filter(r => !(Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0)).length}
 ` +
-      `Linhas com código duplicado: ${result.filter(r => r['_codigoDuplicado']).length}`
+      `Linhas com código duplicado: ${result.filter(r => r['_codigoDuplicado']).length}
+` +
+      `Linhas com IR na maior faixa por falta de data de aquisição: ${result.filter(r => r['_taxConservativeIr']).length}`
     );
   } catch(err){
     console.error(err);
