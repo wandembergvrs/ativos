@@ -735,24 +735,30 @@ function estimateSecondaryRate(row, acq, dfCdi, dfIpca){
   return { label:'-', raw:NaN };
 }
 function project12m(row, panelRate, refDate, cdiFuturePct, ipcaFuturePct, considerMaturity){
-  const price = row['Preço Atualizado CURVA'];
-  if (!Number.isFinite(price) || !refDate) return NaN;
+  const currentTotalValue = toNumber(row['Valor Atualizado CURVA']);
+  const currentUnitPrice = toNumber(row['Preço Atualizado CURVA']);
+  const qtyAvailable = toNumber(row['Quantidade Disponível']);
+  const qty = Number.isFinite(qtyAvailable) && qtyAvailable > 0 ? qtyAvailable : toNumber(row['Quantidade']);
+  const projectionBase = Number.isFinite(currentTotalValue) && currentTotalValue > 0
+    ? currentTotalValue
+    : ((Number.isFinite(currentUnitPrice) && currentUnitPrice > 0 && Number.isFinite(qty) && qty > 0) ? currentUnitPrice * qty : NaN);
+  if (!Number.isFinite(projectionBase) || !refDate) return NaN;
   let endDate = addMonthsDateOnly(refDate, 12);
   if (considerMaturity && row['Vencimento'] && compareDateOnly(row['Vencimento'], endDate) < 0) endDate = row['Vencimento'];
   const du = busdayCount(refDate, endDate);
-  if (du <= 0) return price;
+  if (du <= 0) return projectionBase;
   if (row['Indexador'] === 'DI' && Number.isFinite(panelRate.raw)){
     const daily = annualToDaily(cdiFuturePct);
-    return price * Math.pow(1 + panelRate.raw * daily, du);
+    return projectionBase * Math.pow(1 + panelRate.raw * daily, du);
   }
   if (row['Indexador'] === 'PREFIXADO' && Number.isFinite(panelRate.raw)){
-    return price * Math.pow(1 + panelRate.raw, du/252);
+    return projectionBase * Math.pow(1 + panelRate.raw, du/252);
   }
   if (row['Indexador'] === 'IPCA' && Number.isFinite(panelRate.raw)){
     const ipcaDaily = annualToDaily(ipcaFuturePct);
-    return price * Math.pow((1 + ipcaDaily) * Math.pow(1 + panelRate.raw, 1/252), du);
+    return projectionBase * Math.pow((1 + ipcaDaily) * Math.pow(1 + panelRate.raw, 1/252), du);
   }
-  return NaN;
+  return projectionBase;
 }
 function aggregateTotals(rows){
   const totalCurve = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor Atualizado CURVA'])?r['Valor Atualizado CURVA']:0),0);
@@ -777,8 +783,8 @@ function renderSummary(rows){
     card('Diferença percentual', brPct(t.diffPct), 'Diferença percentual sobre a aquisição conhecida'),
     card('Sem custo informado', String(t.missingCost), 'Quantidade de ativos que podem ser exportados no CSV auxiliar'),
     card('Códigos duplicados', String(t.duplicatedCodes), 'Linhas do recorte com código repetido no painel'),
-    card('Projeção 12m com vencimento', `R$ ${brNumber(rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m com vencimento'])?r['Valor projetado 12m com vencimento']:0),0))}`),
-    card('Projeção 12m sem vencimento', `R$ ${brNumber(rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m sem vencimento'])?r['Valor projetado 12m sem vencimento']:0),0))}`)
+    card('Projeção 12m com vencimento', `R$ ${brNumber(rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m com vencimento'])?r['Valor projetado 12m com vencimento']:0),0))}`, 'Projeção sobre o valor total atual das posições, limitada ao vencimento quando aplicável'),
+    card('Projeção 12m sem vencimento', `R$ ${brNumber(rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m sem vencimento'])?r['Valor projetado 12m sem vencimento']:0),0))}`, 'Projeção sobre o valor total atual das posições, sem truncar no vencimento')
   ].join('');
   el.sumario.innerHTML = html;
   el.sumario.classList.remove('hidden');
