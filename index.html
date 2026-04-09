@@ -71,6 +71,19 @@
     .bar-pos{background:linear-gradient(90deg,rgba(92,156,255,.92),rgba(92,156,255,.75))}
     .toolbar-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .helper-note{font-size:12px;margin-top:6px}
+    .table-legend{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0 12px}
+    .table-legend .tag{display:inline-flex;align-items:center;gap:8px;padding:7px 11px;border-radius:999px;border:1px solid var(--border);font-size:13px;color:var(--muted);background:#13203f}
+    .table-legend .swatch{width:12px;height:12px;border-radius:999px;display:inline-block}
+    .swatch-dup{background:rgba(255,210,122,.95)}
+    .swatch-miss{background:rgba(255,155,155,.95)}
+    .swatch-both{background:rgba(186,146,255,.95)}
+    tr.row-duplicate td{background:rgba(255,210,122,.08)}
+    tr.row-missing-cost td{background:rgba(255,155,155,.08)}
+    tr.row-both td{background:rgba(186,146,255,.11)}
+    .cell-flags{display:flex;gap:6px;flex-wrap:wrap}
+    .flag-chip{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;font-size:11px;line-height:1.2;border:1px solid transparent;white-space:nowrap}
+    .flag-chip.dup{background:rgba(255,210,122,.16);border-color:rgba(255,210,122,.32);color:#ffe5a8}
+    .flag-chip.miss{background:rgba(255,155,155,.16);border-color:rgba(255,155,155,.32);color:#ffd0d0}
   </style>
 </head>
 <body>
@@ -194,6 +207,11 @@
   <section id="painelAnalitico" class="layout hidden">
     <div class="card">
       <h2>Posições</h2>
+      <div class="table-legend">
+        <span class="tag"><span class="swatch swatch-dup"></span>Código duplicado</span>
+        <span class="tag"><span class="swatch swatch-miss"></span>Sem custo de aquisição</span>
+        <span class="tag"><span class="swatch swatch-both"></span>Duplicado + sem custo</span>
+      </div>
       <div class="table-wrap">
         <table id="tabelaMain">
           <thead></thead>
@@ -238,6 +256,8 @@ const state = {
   dfComprasRaw: [],
   composicaoTimeline: [],
   comprasMap: new Map(),
+  comprasByCode: new Map(),
+  codeCounts: new Map(),
   sortColumn: 'Produto painel',
   sortDirection: 'asc',
   refDateRequested: null,
@@ -399,6 +419,53 @@ function normalizeBroker(v){
   if (s === 'BTG Pactual') return 'BANCO BTG PACTUAL S.A.';
   return s;
 }
+function getNumericFromCandidates(row, candidates){
+  for (const key of candidates){
+    const n = toNumber(row[key]);
+    if (Number.isFinite(n)) return n;
+  }
+  return NaN;
+}
+function getPositiveFromCandidates(row, candidates){
+  for (const key of candidates){
+    const n = toNumber(row[key]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return NaN;
+}
+function chooseDisplayedCurrentValue(row){
+  const curveValue = toNumber(row['Valor Atualizado CURVA']);
+  const fechamentoValue = getPositiveFromCandidates(row, [
+    'Valor Atualizado FECHAMENTO','Valor Atualizado Fechamento','Valor Atualizado fechamento',
+    'Valor atualizado fechamento','Valor Fechamento','Valor Atualizado'
+  ]);
+  const curvePrice = toNumber(row['Preço Atualizado CURVA']);
+  const fechamentoPrice = getPositiveFromCandidates(row, [
+    'Preço Atualizado FECHAMENTO','Preço Atualizado Fechamento','Preço Atualizado fechamento',
+    'Preço atualizado fechamento','Preço Fechamento','Preço Atualizado'
+  ]);
+  const qtdDisponivel = toNumber(row['Quantidade Disponível']);
+  const qty = Number.isFinite(qtdDisponivel) && qtdDisponivel > 0 ? qtdDisponivel : toNumber(row['Quantidade']);
+
+  if (Number.isFinite(curveValue) && curveValue > 0){
+    return {
+      value: curveValue,
+      source: 'CURVA',
+      price: (Number.isFinite(curvePrice) && curvePrice > 0) ? curvePrice : (Number.isFinite(qty) && qty > 0 ? curveValue / qty : NaN)
+    };
+  }
+  if (Number.isFinite(fechamentoValue) && fechamentoValue > 0){
+    return {
+      value: fechamentoValue,
+      source: 'FECHAMENTO',
+      price: (Number.isFinite(fechamentoPrice) && fechamentoPrice > 0) ? fechamentoPrice : (Number.isFinite(qty) && qty > 0 ? fechamentoValue / qty : NaN)
+    };
+  }
+  return { value: NaN, source: '', price: NaN };
+}
+function normalizeTextLoose(v){
+  return String(v ?? '').trim().toLowerCase();
+}
 function chooseFaceValue(currentPrice){
   const cands = [1,100,500,1000];
   if (!Number.isFinite(currentPrice)) return 1000;
@@ -497,8 +564,15 @@ function prepareCompras(rows){
     status_posicao_compra: r.status_posicao_compra ?? ''
   })).filter(r => r.codigo);
 }
-function buildComprasMap(rows){
-  return new Map(rows.map(r => [`${r.codigo}||${normalizeBroker(r.corretora_atual)}`, r]));
+function buildComprasMaps(rows){
+  const byCodeBroker = new Map();
+  const byCode = new Map();
+  rows.forEach(r => {
+    byCodeBroker.set(`${r.codigo}||${normalizeBroker(r.corretora_atual)}`, r);
+    if (!byCode.has(r.codigo)) byCode.set(r.codigo, []);
+    byCode.get(r.codigo).push(r);
+  });
+  return { byCodeBroker, byCode };
 }
 function preparePosicao(rows){
   return rows.map(r => {
@@ -509,6 +583,21 @@ function preparePosicao(rows){
     row['Data de Emissão'] = dateOnlyFromExcel(row['Data de Emissão']);
     row['Vencimento'] = dateOnlyFromExcel(row['Vencimento']);
     ['Quantidade','Quantidade Disponível','Preço Atualizado CURVA','Valor Atualizado CURVA'].forEach(c => row[c] = toNumber(row[c]));
+    row['_valorAtualizadoCurvaOriginal'] = row['Valor Atualizado CURVA'];
+    row['_valorAtualizadoFechamento'] = getNumericFromCandidates(row, [
+      'Valor Atualizado FECHAMENTO','Valor Atualizado Fechamento','Valor Atualizado fechamento',
+      'Valor atualizado fechamento','Valor Fechamento','Valor Atualizado'
+    ]);
+    row['_precoAtualizadoFechamento'] = getNumericFromCandidates(row, [
+      'Preço Atualizado FECHAMENTO','Preço Atualizado Fechamento','Preço Atualizado fechamento',
+      'Preço atualizado fechamento','Preço Fechamento','Preço Atualizado'
+    ]);
+    const chosenCurrent = chooseDisplayedCurrentValue(row);
+    row['_origemValorAtualizado'] = chosenCurrent.source;
+    row['Valor Atualizado CURVA'] = chosenCurrent.value;
+    if ((!Number.isFinite(row['Preço Atualizado CURVA']) || row['Preço Atualizado CURVA'] <= 0) && Number.isFinite(chosenCurrent.price)) {
+      row['Preço Atualizado CURVA'] = chosenCurrent.price;
+    }
     return row;
   }).filter(r => r['Código']);
 }
@@ -638,7 +727,8 @@ function aggregateTotals(rows){
   const diff = totalCurve - totalAq;
   const diffPct = totalAq ? diff/totalAq*100 : NaN;
   const missingCost = rows.filter(r => !(Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0)).length;
-  return { totalCurve, totalAq, diff, diffPct, missingCost };
+  const duplicatedCodes = rows.filter(r => r['_codigoDuplicado']).length;
+  return { totalCurve, totalAq, diff, diffPct, missingCost, duplicatedCodes };
 }
 function card(label, value, sub=''){
   return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
@@ -647,11 +737,12 @@ function renderSummary(rows){
   const t = aggregateTotals(rows);
   const html = [
     card('Linhas no recorte', String(rows.length), `Data de referência solicitada: ${formatDate(state.refDateRequested)}`),
-    card('Aquisição conhecida', `R$ ${brNumber(t.totalAq)}`, 'Somatório do custo de aquisição casado por código + corretora'),
+    card('Aquisição conhecida', `R$ ${brNumber(t.totalAq)}`, 'Somatório do custo de aquisição com fallback subsidiário por código quando não há match por corretora'),
     card('Valor na curva', `R$ ${brNumber(t.totalCurve)}`, 'Somatório do valor atualizado na curva do recorte'),
     card('Diferença absoluta', `R$ ${brNumber(t.diff)}`, 'Curva menos aquisição conhecida'),
     card('Diferença percentual', brPct(t.diffPct), 'Diferença percentual sobre a aquisição conhecida'),
     card('Sem custo informado', String(t.missingCost), 'Quantidade de ativos que podem ser exportados no CSV auxiliar'),
+    card('Códigos duplicados', String(t.duplicatedCodes), 'Linhas do recorte com código repetido no painel'),
     card('Projeção 12m com vencimento', `R$ ${brNumber(rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m com vencimento'])?r['Valor projetado 12m com vencimento']:0),0))}`),
     card('Projeção 12m sem vencimento', `R$ ${brNumber(rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m sem vencimento'])?r['Valor projetado 12m sem vencimento']:0),0))}`)
   ].join('');
@@ -779,10 +870,24 @@ function applyFilters(){
   renderComposition(rows);
   updateMissingCostButtonState();
 }
+function getRowClass(row){
+  const dup = !!row['_codigoDuplicado'];
+  const miss = !(Number.isFinite(row['Custo aquisição']) && row['Custo aquisição'] > 0);
+  if (dup && miss) return 'row-both';
+  if (dup) return 'row-duplicate';
+  if (miss) return 'row-missing-cost';
+  return '';
+}
+function getRowFlagsHtml(row){
+  const flags = [];
+  if (row['_codigoDuplicado']) flags.push('<span class="flag-chip dup">Código duplicado</span>');
+  if (!(Number.isFinite(row['Custo aquisição']) && row['Custo aquisição'] > 0)) flags.push('<span class="flag-chip miss">Sem custo</span>');
+  return flags.length ? `<div class="cell-flags">${flags.join('')}</div>` : '';
+}
 function renderMainTable(rows){
   el.painelAnalitico.classList.remove('hidden');
   el.tabelaMainHead.innerHTML = `<tr>${TABLE_COLUMNS.map(c => `<th data-col="${escapeHtml(c)}">${escapeHtml(c)}</th>`).join('')}</tr>`;
-  el.tabelaMainBody.innerHTML = rows.map(r => `<tr>${TABLE_COLUMNS.map(c => renderCell(c, r[c])).join('')}</tr>`).join('');
+  el.tabelaMainBody.innerHTML = rows.map(r => `<tr class="${getRowClass(r)}">${TABLE_COLUMNS.map(c => renderCell(c, r[c], c === 'Produto painel' ? r : null)).join('')}</tr>`).join('');
   el.tabelaMainHead.querySelectorAll('th').forEach(th => {
     th.addEventListener('click', ()=>{
       const col = th.dataset.col;
@@ -792,10 +897,11 @@ function renderMainTable(rows){
     });
   });
 }
-function renderCell(col, val){
+function renderCell(col, val, row=null){
   if (NUMERIC_COLUMNS.has(col)) return `<td class="right">${Number.isFinite(val) ? 'R$ ' + brNumber(val) : '-'}</td>`;
   if (col === 'Taxa painel' || col === 'Taxa compra secundário') return `<td>${escapeHtml(val || '-')}</td>`;
   if (col === 'Emissão painel' || col === 'Vencimento painel' || col === 'Data aquisição') return `<td>${formatDate(val)}</td>`;
+  if (col === 'Produto painel' && row) return `<td><div>${escapeHtml(val ?? '-')}</div>${getRowFlagsHtml(row)}</td>`;
   return `<td>${escapeHtml(val ?? '-')}</td>`;
 }
 function monthKey(dateObj){ return dateObj ? `${dateObj.y}-${String(dateObj.m).padStart(2,'0')}` : ''; }
@@ -841,7 +947,7 @@ function renderMesSelecionado(g){
   const cols = ['Produto painel','Corretora painel','Emissor painel','Código','Vencimento painel','Valor Atualizado CURVA'];
   el.tabelaMesHead.innerHTML = `<tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
   const itens = [...g.itens].sort((a,b)=>compareVals(a['Vencimento painel'] ? dateOnlyToKey(a['Vencimento painel']) : '', b['Vencimento painel'] ? dateOnlyToKey(b['Vencimento painel']) : ''));
-  el.tabelaMesBody.innerHTML = itens.map(r => `<tr>${cols.map(c => renderCell(c,r[c])).join('')}</tr>`).join('');
+  el.tabelaMesBody.innerHTML = itens.map(r => `<tr class="${getRowClass(r)}">${cols.map(c => renderCell(c,r[c], c === 'Produto painel' ? r : null)).join('')}</tr>`).join('');
 }
 function getMissingCostRows(rows){
   return rows.filter(r => !(Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0)).map(r => ({
@@ -926,6 +1032,8 @@ function clearAll(){
   state.dfComprasRaw=[];
   state.composicaoTimeline=[];
   state.comprasMap = new Map();
+  state.comprasByCode = new Map();
+  state.codeCounts = new Map();
   state.refDateRequested = null;
   state.cdiRefDate = null;
   state.ipcaRefDate = null;
@@ -953,8 +1061,29 @@ function clearAll(){
   setComputerDateDisplay();
   setStatus('');
 }
-function matchAcq(code, broker){
-  return state.comprasMap.get(`${code}||${normalizeBroker(broker)}`) || null;
+function matchAcq(code, broker, product='', issuer=''){
+  const brokerKey = `${code}||${normalizeBroker(broker)}`;
+  const exact = state.comprasMap.get(brokerKey);
+  if (exact) return { record: exact, mode: 'codigo_corretora' };
+
+  const candidates = state.comprasByCode.get(code) || [];
+  if (!candidates.length) return { record: null, mode: 'sem_match' };
+  if (candidates.length === 1) return { record: candidates[0], mode: 'codigo' };
+
+  const productNorm = normalizeTextLoose(product);
+  const issuerNorm = normalizeTextLoose(issuer);
+  const scored = candidates.map((cand, idx) => {
+    let score = 0;
+    const candProd = normalizeTextLoose(cand.produto_painel);
+    const candIssuer = normalizeTextLoose(cand.emissor_painel);
+    if (productNorm && candProd === productNorm) score += 2;
+    if (issuerNorm && candIssuer === issuerNorm) score += 2;
+    if (productNorm && candProd.includes(productNorm)) score += 1;
+    if (issuerNorm && candIssuer.includes(issuerNorm)) score += 1;
+    return { cand, idx, score };
+  }).sort((a,b) => b.score - a.score || a.idx - b.idx);
+
+  return { record: scored[0].cand || null, mode: scored[0] && scored[0].score > 0 ? 'codigo_refinado' : 'codigo' };
 }
 
 setDefaultReferenceDate();
@@ -990,6 +1119,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const dfCdi = prepareCdi(cdiRows);
     const dfIpca = prepareIpca(ipcaRows);
     const dfCompras = prepareCompras(comprasRows);
+    const comprasMaps = buildComprasMaps(dfCompras);
 
     const cdiRefDate = chooseLastAvailableDate(dfCdi, requestedRef);
     const ipcaRefDate = dfIpca.length ? chooseLastAvailableDate(dfIpca, requestedRef) : requestedRef;
@@ -1001,7 +1131,8 @@ el.btnProcessar.addEventListener('click', async ()=>{
     state.dfCdi = dfCdi;
     state.dfIpca = dfIpca;
     state.dfCompras = dfCompras;
-    state.comprasMap = buildComprasMap(dfCompras);
+    state.comprasMap = comprasMaps.byCodeBroker;
+    state.comprasByCode = comprasMaps.byCode;
     state.refDateRequested = requestedRef;
     state.cdiRefDate = cdiRefDate;
     state.ipcaRefDate = ipcaRefDate;
@@ -1009,37 +1140,47 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const cdiFuture = toNumber(el.cdiFuturo.value);
     const ipcaFuture = toNumber(el.ipcaFuturo.value);
 
-    const result = dfPos.filter(r => ['DI','PREFIXADO','IPCA'].includes(r['Indexador'])).map(row => {
-      const panelRate = estimatePanelRate(row, dfCdi, dfIpca, {
-        requested: requestedRef,
-        cdi: cdiRefDate,
-        ipca: ipcaRefDate
+    const result = dfPos
+      .filter(r => ['DI','PREFIXADO','IPCA'].includes(r['Indexador']))
+      .filter(r => Number.isFinite(r['Valor Atualizado CURVA']) && r['Valor Atualizado CURVA'] > 0)
+      .map(row => {
+        const panelRate = estimatePanelRate(row, dfCdi, dfIpca, {
+          requested: requestedRef,
+          cdi: cdiRefDate,
+          ipca: ipcaRefDate
+        });
+        const acqMatch = matchAcq(row['Código'], row['Instituição'], row['Produto'], row['Emissor']);
+        const acq = acqMatch.record;
+        const secRate = estimateSecondaryRate(row, acq, dfCdi, dfIpca);
+        const v12Mat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, true);
+        const v12NoMat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, false);
+        const quantidadeBase = Number.isFinite(row['Quantidade Disponível']) ? row['Quantidade Disponível'] : row['Quantidade'];
+        return {
+          'Produto painel': row['Produto'],
+          'Corretora painel': row['Instituição'],
+          'Emissor painel': row['Emissor'],
+          'Código': row['Código'],
+          'Indexador': row['Indexador'],
+          'Emissão painel': row['Data de Emissão'],
+          'Vencimento painel': row['Vencimento'],
+          'Taxa painel': panelRate.label,
+          'Valor Atualizado CURVA': row['Valor Atualizado CURVA'],
+          'Data aquisição': acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null,
+          'Custo aquisição': acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : 0,
+          'PU aquisição': acq && Number.isFinite(acq.pu_aquisicao_medio_aberto) ? acq.pu_aquisicao_medio_aberto : NaN,
+          'Taxa compra secundário': secRate.label,
+          'Valor projetado 12m com vencimento': v12Mat,
+          'Valor projetado 12m sem vencimento': v12NoMat,
+          '_quantidadeBase': quantidadeBase,
+          '_tipoComposicao': getFixType(row['Indexador']),
+          '_origemValorAtualizado': row['_origemValorAtualizado'] || 'CURVA',
+          '_costMatchMode': acqMatch.mode
+        };
       });
-      const acq = matchAcq(row['Código'], row['Instituição']);
-      const secRate = estimateSecondaryRate(row, acq, dfCdi, dfIpca);
-      const v12Mat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, true);
-      const v12NoMat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, false);
-      const quantidadeBase = Number.isFinite(row['Quantidade Disponível']) ? row['Quantidade Disponível'] : row['Quantidade'];
-      return {
-        'Produto painel': row['Produto'],
-        'Corretora painel': row['Instituição'],
-        'Emissor painel': row['Emissor'],
-        'Código': row['Código'],
-        'Indexador': row['Indexador'],
-        'Emissão painel': row['Data de Emissão'],
-        'Vencimento painel': row['Vencimento'],
-        'Taxa painel': panelRate.label,
-        'Valor Atualizado CURVA': row['Valor Atualizado CURVA'],
-        'Data aquisição': acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null,
-        'Custo aquisição': acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : 0,
-        'PU aquisição': acq && Number.isFinite(acq.pu_aquisicao_medio_aberto) ? acq.pu_aquisicao_medio_aberto : NaN,
-        'Taxa compra secundário': secRate.label,
-        'Valor projetado 12m com vencimento': v12Mat,
-        'Valor projetado 12m sem vencimento': v12NoMat,
-        '_quantidadeBase': quantidadeBase,
-        '_tipoComposicao': getFixType(row['Indexador'])
-      };
-    });
+    const codeCounts = new Map();
+    result.forEach(r => codeCounts.set(r['Código'], (codeCounts.get(r['Código']) || 0) + 1));
+    result.forEach(r => { r['_codigoDuplicado'] = (codeCounts.get(r['Código']) || 0) > 1; });
+    state.codeCounts = codeCounts;
 
     state.dfResultado = result;
     state.sortColumn = 'Produto painel';
@@ -1055,9 +1196,15 @@ el.btnProcessar.addEventListener('click', async ()=>{
       `Data histórica CDI usada: ${formatDate(cdiRefDate)}\n` +
       `Data histórica IPCA usada: ${formatDate(ipcaRefDate)}\n` +
       `Hora local do processamento: ${new Date().toLocaleString('pt-BR')}\n` +
-      `Linhas tratadas: ${result.length}\n` +
-      `Compras casadas por código + corretora: ${result.filter(r => r['Custo aquisição'] > 0).length}\n` +
-      `Ativos sem custo informado: ${result.filter(r => !(Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0)).length}`
+      `Linhas exibidas no painel: ${result.length}
+` +
+      `Compras com match exato por código + corretora: ${result.filter(r => r['_costMatchMode'] === 'codigo_corretora').length}
+` +
+      `Compras com fallback por código: ${result.filter(r => r['_costMatchMode'] !== 'codigo_corretora' && Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0).length}
+` +
+      `Ativos sem custo informado: ${result.filter(r => !(Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0)).length}
+` +
+      `Linhas com código duplicado: ${result.filter(r => r['_codigoDuplicado']).length}`
     );
   } catch(err){
     console.error(err);
