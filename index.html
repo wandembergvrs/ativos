@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Painel de Renda Fixa - Corretora, Curva e Secundário</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
@@ -277,8 +280,15 @@ function addMonthsDateOnly(o,months){
   return { y:dt.getFullYear(), m:dt.getMonth()+1, d:dt.getDate() };
 }
 function todayDateOnly(){
-  const d = new Date();
-  return { y:d.getFullYear(), m:d.getMonth()+1, d:d.getDate() };
+  const now = new Date();
+  return { y:now.getFullYear(), m:now.getMonth()+1, d:now.getDate() };
+}
+function setComputerDateDisplay(){
+  if (el && el.todayDisplay) {
+    setComputerDateDisplay();
+window.addEventListener('focus', setComputerDateDisplay);
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) setComputerDateDisplay(); });
+  }
 }
 function busdayCount(startObj,endObj){
   if (!startObj || !endObj || compareDateOnly(endObj,startObj) <= 0) return 0;
@@ -671,12 +681,15 @@ function matchAcq(code, broker){
   return state.dfCompras.find(r => r.codigo === code && normalizeBroker(r.corretora_atual) === normalizeBroker(broker)) || null;
 }
 
-el.todayDisplay.value = formatDate(todayDateOnly());
+setComputerDateDisplay();
+window.addEventListener('focus', setComputerDateDisplay);
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) setComputerDateDisplay(); });
 
 el.btnProcessar.addEventListener('click', async ()=>{
   try{
     if (!el.arquivoPosicao.files[0]) throw new Error('Selecione a planilha de posição.');
     el.btnProcessar.disabled = true;
+    setComputerDateDisplay();
     setStatus('Lendo planilha, séries e custos de aquisição...');
     const comprasInfoPromise = fetchFirstCsv([
       './compras_secundario.csv'
@@ -745,6 +758,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
       `Aba usada: ${actualSheet}\n` +
       `Data do computador usada no painel: ${formatDate(todayRef)}\n` +
       `Última data CDI disponível usada no cálculo histórico: ${formatDate(cdiRefDate)}\n` +
+      `Hora local do processamento: ${new Date().toLocaleString('pt-BR')}\n` +
       `Linhas tratadas: ${result.length}\n` +
       `Compras casadas por código + corretora: ${result.filter(r => r['Custo aquisição'] > 0).length}`
     );
