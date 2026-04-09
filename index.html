@@ -25,9 +25,10 @@
     .grid{display:grid;gap:16px}
     .grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
     .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
     .controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-    @media (max-width:1200px){.controls,.grid-4,.grid-3{grid-template-columns:repeat(2,minmax(0,1fr));}}
-    @media (max-width:760px){.controls,.grid-4,.grid-3{grid-template-columns:1fr;}}
+    @media (max-width:1200px){.controls,.grid-4,.grid-3,.grid-2{grid-template-columns:repeat(2,minmax(0,1fr));}}
+    @media (max-width:760px){.controls,.grid-4,.grid-3,.grid-2{grid-template-columns:1fr;}}
     .field{display:flex;flex-direction:column;gap:8px}
     .field label{font-size:13px;color:var(--muted)}
     input,select{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:11px 12px;outline:none}
@@ -84,6 +85,12 @@
     .flag-chip{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;font-size:11px;line-height:1.2;border:1px solid transparent;white-space:nowrap}
     .flag-chip.dup{background:rgba(255,210,122,.16);border-color:rgba(255,210,122,.32);color:#ffe5a8}
     .flag-chip.miss{background:rgba(255,155,155,.16);border-color:rgba(255,155,155,.32);color:#ffd0d0}
+    .tabs-shell{padding:12px 14px}
+    .tabs-nav{display:flex;gap:10px;flex-wrap:wrap}
+    .tab-btn{background:#182449;border:1px solid var(--border);color:var(--muted);padding:10px 14px;border-radius:12px;font-weight:600}
+    .tab-btn.active{background:rgba(92,156,255,.16);border-color:rgba(92,156,255,.45);color:#eaf2ff;box-shadow:inset 0 0 0 1px rgba(92,156,255,.12)}
+    .tab-panel{margin-bottom:16px}
+    .panel-intro{margin:-4px 0 10px;color:var(--muted);font-size:13px}
   </style>
 </head>
 <body>
@@ -150,9 +157,18 @@
     <div id="status" class="status"></div>
   </section>
 
-  <section id="sumario" class="grid grid-4 hidden"></section>
+  <section id="tabsNav" class="card tabs-shell hidden">
+    <div class="tabs-nav">
+      <button type="button" class="tab-btn active" data-tab-target="resumo">Visão geral</button>
+      <button type="button" class="tab-btn" data-tab-target="posicoes">Posições</button>
+      <button type="button" class="tab-btn" data-tab-target="composicao">Composição temporal</button>
+      <button type="button" class="tab-btn" data-tab-target="vencimentos">Vencimentos</button>
+    </div>
+  </section>
 
-  <section id="filtros" class="card hidden">
+  <section id="sumario" data-tab="resumo" class="grid grid-4 hidden tab-panel"></section>
+
+  <section id="filtros" data-tab="posicoes" class="card hidden tab-panel">
     <h2>Filtros</h2>
     <div class="controls">
       <div class="field">
@@ -180,7 +196,7 @@
     <p class="sub">Use Ctrl no Windows ou Cmd no Mac para selecionar mais de um emissor.</p>
   </section>
 
-  <section id="composicaoTemporal" class="card hidden">
+  <section id="composicaoTemporal" data-tab="composicao" class="card hidden tab-panel">
     <h2>Composição ponderada de prefixados x pós-fixados ao longo do tempo</h2>
     <p class="sub">Peso calculado sobre o valor atualizado na curva do portfólio remanescente em cada mês. Pós-fixado = DI + IPCA.</p>
     <div class="legend">
@@ -204,44 +220,44 @@
     </div>
   </section>
 
-  <section id="painelAnalitico" class="layout hidden">
-    <div class="card">
-      <h2>Posições</h2>
-      <div class="table-legend">
-        <span class="tag"><span class="swatch swatch-dup"></span>Código duplicado</span>
-        <span class="tag"><span class="swatch swatch-miss"></span>Sem custo de aquisição</span>
-        <span class="tag"><span class="swatch swatch-both"></span>Duplicado + sem custo</span>
-      </div>
+  <section id="posicoesPanel" data-tab="posicoes" class="card hidden tab-panel">
+    <h2>Posições</h2>
+    <p class="panel-intro">Tabela principal com filtros, destaque de códigos duplicados e indicação dos ativos ainda sem custo de aquisição.</p>
+    <div class="table-legend">
+      <span class="tag"><span class="swatch swatch-dup"></span>Código duplicado</span>
+      <span class="tag"><span class="swatch swatch-miss"></span>Sem custo de aquisição</span>
+      <span class="tag"><span class="swatch swatch-both"></span>Duplicado + sem custo</span>
+    </div>
+    <div class="table-wrap">
+      <table id="tabelaMain">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="footer-note">A coluna de custo de aquisição usa o arquivo consolidado por código e corretora. Quando não houver histórico correspondente, o custo aparece zerado e o ativo pode ser exportado no CSV auxiliar.</div>
+  </section>
+
+  <section id="vencimentosPanel" data-tab="vencimentos" class="grid grid-2 hidden tab-panel">
+    <section class="card">
+      <h2>Cronograma de vencimentos por mês</h2>
+      <p class="panel-intro">Clique em um mês para ver, ao lado, apenas os ativos que vencem naquele período.</p>
       <div class="table-wrap">
-        <table id="tabelaMain">
+        <table id="tabelaCronograma" class="mini-table">
           <thead></thead>
           <tbody></tbody>
         </table>
       </div>
-      <div class="footer-note">A coluna de custo de aquisição usa o arquivo consolidado por código e corretora. Quando não houver histórico correspondente, o custo aparece zerado e o ativo pode ser exportado no CSV auxiliar.</div>
-    </div>
+    </section>
 
-    <div class="grid">
-      <section class="card">
-        <h2>Cronograma de vencimentos por mês</h2>
-        <div class="table-wrap">
-          <table id="tabelaCronograma" class="mini-table">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2 id="cronogramaTitulo">Ativos do mês selecionado</h2>
-        <div class="table-wrap">
-          <table id="tabelaMes" class="mini-table">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
-    </div>
+    <section class="card">
+      <h2 id="cronogramaTitulo">Ativos do mês selecionado</h2>
+      <div class="table-wrap">
+        <table id="tabelaMes" class="mini-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
   </section>
 </div>
 
@@ -262,7 +278,8 @@ const state = {
   sortDirection: 'asc',
   refDateRequested: null,
   cdiRefDate: null,
-  ipcaRefDate: null
+  ipcaRefDate: null,
+  activeTab: 'resumo'
 };
 
 const TABLE_COLUMNS = [
@@ -298,11 +315,13 @@ const el = {
   status: document.getElementById('status'),
   sumario: document.getElementById('sumario'),
   filtros: document.getElementById('filtros'),
+  tabsNav: document.getElementById('tabsNav'),
   composicaoTemporal: document.getElementById('composicaoTemporal'),
   timelineBars: document.getElementById('timelineBars'),
   tabelaComposicaoHead: document.querySelector('#tabelaComposicao thead'),
   tabelaComposicaoBody: document.querySelector('#tabelaComposicao tbody'),
-  painelAnalitico: document.getElementById('painelAnalitico'),
+  posicoesPanel: document.getElementById('posicoesPanel'),
+  vencimentosPanel: document.getElementById('vencimentosPanel'),
   filtroBusca: document.getElementById('filtroBusca'),
   filtroIndexador: document.getElementById('filtroIndexador'),
   filtroEmissorIncluir: document.getElementById('filtroEmissorIncluir'),
@@ -313,10 +332,24 @@ const el = {
   tabelaCronogramaBody: document.querySelector('#tabelaCronograma tbody'),
   cronogramaTitulo: document.getElementById('cronogramaTitulo'),
   tabelaMesHead: document.querySelector('#tabelaMes thead'),
-  tabelaMesBody: document.querySelector('#tabelaMes tbody')
+  tabelaMesBody: document.querySelector('#tabelaMes tbody'),
+  tabButtons: [...document.querySelectorAll('.tab-btn')]
 };
 
 function setStatus(t){ el.status.textContent = t || ''; }
+function setActiveTab(tab){
+  state.activeTab = tab;
+  if (el.tabButtons) {
+    el.tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tabTarget === tab));
+  }
+  document.querySelectorAll('[data-tab]').forEach(node => {
+    node.classList.toggle('hidden', node.dataset.tab !== tab);
+  });
+}
+function showTabbedPanels(){
+  el.tabsNav.classList.remove('hidden');
+  setActiveTab(state.activeTab || 'resumo');
+}
 function brNumber(v,d=2){ return (v===null || v===undefined || Number.isNaN(v)) ? '-' : Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 function brPct(v,d=2){ return (v===null || v===undefined || Number.isNaN(v)) ? '-' : `${Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})}%`; }
 function escapeHtml(s){ return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
@@ -734,6 +767,7 @@ function card(label, value, sub=''){
   return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
 }
 function renderSummary(rows){
+  el.sumario.classList.remove('hidden');
   const t = aggregateTotals(rows);
   const html = [
     card('Linhas no recorte', String(rows.length), `Data de referência solicitada: ${formatDate(state.refDateRequested)}`),
@@ -813,6 +847,7 @@ function computeCompositionTimeline(rows, refDate){
   return out;
 }
 function renderComposition(rows){
+  el.composicaoTemporal.classList.remove('hidden');
   const timeline = computeCompositionTimeline(rows, state.refDateRequested);
   state.composicaoTimeline = timeline;
   if (!timeline.length){
@@ -869,6 +904,7 @@ function applyFilters(){
   renderCronograma(rows);
   renderComposition(rows);
   updateMissingCostButtonState();
+  showTabbedPanels();
 }
 function getRowClass(row){
   const dup = !!row['_codigoDuplicado'];
@@ -885,7 +921,7 @@ function getRowFlagsHtml(row){
   return flags.length ? `<div class="cell-flags">${flags.join('')}</div>` : '';
 }
 function renderMainTable(rows){
-  el.painelAnalitico.classList.remove('hidden');
+  el.posicoesPanel.classList.remove('hidden');
   el.tabelaMainHead.innerHTML = `<tr>${TABLE_COLUMNS.map(c => `<th data-col="${escapeHtml(c)}">${escapeHtml(c)}</th>`).join('')}</tr>`;
   el.tabelaMainBody.innerHTML = rows.map(r => `<tr class="${getRowClass(r)}">${TABLE_COLUMNS.map(c => renderCell(c, r[c], c === 'Produto painel' ? r : null)).join('')}</tr>`).join('');
   el.tabelaMainHead.querySelectorAll('th').forEach(th => {
@@ -906,6 +942,7 @@ function renderCell(col, val, row=null){
 }
 function monthKey(dateObj){ return dateObj ? `${dateObj.y}-${String(dateObj.m).padStart(2,'0')}` : ''; }
 function renderCronograma(rows){
+  el.vencimentosPanel.classList.remove('hidden');
   const groups = new Map();
   for (const r of rows){
     const venc = r['Vencimento painel'];
@@ -1037,6 +1074,7 @@ function clearAll(){
   state.refDateRequested = null;
   state.cdiRefDate = null;
   state.ipcaRefDate = null;
+  state.activeTab = 'resumo';
   el.arquivoPosicao.value='';
   el.filtroBusca.value='';
   el.filtroIndexador.value='';
@@ -1047,7 +1085,9 @@ function clearAll(){
   el.sumario.classList.add('hidden');
   el.filtros.classList.add('hidden');
   el.composicaoTemporal.classList.add('hidden');
-  el.painelAnalitico.classList.add('hidden');
+  el.tabsNav.classList.add('hidden');
+  el.posicoesPanel.classList.add('hidden');
+  el.vencimentosPanel.classList.add('hidden');
   el.timelineBars.innerHTML='';
   el.tabelaComposicaoHead.innerHTML='';
   el.tabelaComposicaoBody.innerHTML='';
@@ -1090,6 +1130,10 @@ setDefaultReferenceDate();
 setComputerDateDisplay();
 window.addEventListener('focus', setComputerDateDisplay);
 document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) setComputerDateDisplay(); });
+
+if (el.tabButtons) {
+  el.tabButtons.forEach(btn => btn.addEventListener('click', ()=> setActiveTab(btn.dataset.tabTarget)));
+}
 
 el.btnHoje.addEventListener('click', ()=>{
   setDefaultReferenceDate();
