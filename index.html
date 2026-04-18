@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -91,6 +92,10 @@
     .tab-btn.active{background:rgba(92,156,255,.16);border-color:rgba(92,156,255,.45);color:#eaf2ff;box-shadow:inset 0 0 0 1px rgba(92,156,255,.12)}
     .tab-panel{margin-bottom:16px}
     .panel-intro{margin:-4px 0 10px;color:var(--muted);font-size:13px}
+    .compare-note{font-size:12px;color:var(--muted);margin-top:6px}
+    .compare-stats{display:grid;gap:16px;grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px}
+    @media (max-width:1200px){.compare-stats{grid-template-columns:repeat(2,minmax(0,1fr));}}
+    @media (max-width:760px){.compare-stats{grid-template-columns:1fr;}}
   </style>
 </head>
 <body>
@@ -158,12 +163,41 @@
     <div id="status" class="status"></div>
   </section>
 
+<section class="card">
+    <h2>Comparação de rendimento entre duas posições</h2>
+    <p class="sub">Opcional. Compare duas planilhas de posição. A comparação agrupa por código, mesmo que a corretora tenha mudado, e usa apenas os códigos presentes nas duas datas. Quando a quantidade muda, o cálculo fica limitado pela quantidade do período inicial, usando o Preço Atualizado CURVA de cada data multiplicado pela quantidade inicial.</p>
+    <div class="controls">
+      <div class="field">
+        <label for="arquivoComp1">Planilha inicial (.xlsx)</label>
+        <input id="arquivoComp1" type="file" accept=".xlsx" />
+      </div>
+      <div class="field">
+        <label for="arquivoComp2">Planilha final (.xlsx)</label>
+        <input id="arquivoComp2" type="file" accept=".xlsx" />
+      </div>
+      <div class="field">
+        <label for="dataComp1">Data inicial da posição</label>
+        <input id="dataComp1" type="date" />
+      </div>
+      <div class="field">
+        <label for="dataComp2">Data final da posição</label>
+        <input id="dataComp2" type="date" />
+      </div>
+    </div>
+    <div class="actions">
+      <button id="btnComparar">Processar comparação</button>
+    </div>
+    <div class="compare-note">As datas podem ser preenchidas automaticamente a partir do nome do arquivo, quando houver algo como 2026-04-08. O rendimento mensal mostrado é o equivalente mensal implícito entre as duas datas.</div>
+    <div id="compareStatus" class="status"></div>
+  </section>
+
   <section id="tabsNav" class="card tabs-shell hidden">
     <div class="tabs-nav">
       <button type="button" class="tab-btn active" data-tab-target="resumo">Visão geral</button>
       <button type="button" class="tab-btn" data-tab-target="posicoes">Posições</button>
       <button type="button" class="tab-btn" data-tab-target="composicao">Composição temporal</button>
       <button type="button" class="tab-btn" data-tab-target="vencimentos">Vencimentos</button>
+      <button type="button" class="tab-btn hidden" id="tabComparacaoBtn" data-tab-target="comparacao">Comparação</button>
     </div>
   </section>
 
@@ -260,6 +294,17 @@
       </div>
     </section>
   </section>
+  <section id="comparacaoPanel" data-tab="comparacao" class="card hidden tab-panel">
+    <h2>Comparação de rendimento entre duas posições</h2>
+    <p class="panel-intro">O cálculo agrupa por código, ignora mudanças de corretora e considera apenas os códigos presentes nas duas planilhas. Quando a quantidade muda, o valor comparável é limitado pela quantidade do período inicial.</p>
+    <div id="comparacaoResumo" class="compare-stats"></div>
+    <div class="table-wrap">
+      <table id="tabelaComparacao">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -280,7 +325,9 @@ const state = {
   refDateRequested: null,
   cdiRefDate: null,
   ipcaRefDate: null,
-  activeTab: 'resumo'
+  activeTab: 'resumo',
+  comparisonRows: [],
+  comparisonMeta: null
 };
 
 const TABLE_COLUMNS = [
@@ -305,6 +352,15 @@ const MISSING_COST_HEADERS = [
   'custo_aquisicao_total_aberto','pu_aquisicao_medio_aberto','lotes_abertos','detalhe_lotes_abertos','status_posicao_compra'
 ];
 
+const COMPARISON_COLUMNS = [
+  'Produto','Emissor','Código','Indexador',
+  'Corretoras inicial','Corretoras final',
+  'Quantidade inicial','Quantidade final','Quantidade usada',
+  'Preço curva inicial','Preço curva final',
+  'Valor inicial comparável','Valor final comparável',
+  'Rendimento total','Rendimento %','Rendimento mensal equivalente'
+];
+
 const el = {
   arquivoPosicao: document.getElementById('arquivoPosicao'),
   nomeAba: document.getElementById('nomeAba'),
@@ -317,7 +373,13 @@ const el = {
   btnExportar: document.getElementById('btnExportar'),
   btnExportarSemCusto: document.getElementById('btnExportarSemCusto'),
   btnLimpar: document.getElementById('btnLimpar'),
+  btnComparar: document.getElementById('btnComparar'),
   status: document.getElementById('status'),
+  compareStatus: document.getElementById('compareStatus'),
+  arquivoComp1: document.getElementById('arquivoComp1'),
+  arquivoComp2: document.getElementById('arquivoComp2'),
+  dataComp1: document.getElementById('dataComp1'),
+  dataComp2: document.getElementById('dataComp2'),
   sumario: document.getElementById('sumario'),
   filtros: document.getElementById('filtros'),
   tabsNav: document.getElementById('tabsNav'),
@@ -338,10 +400,16 @@ const el = {
   cronogramaTitulo: document.getElementById('cronogramaTitulo'),
   tabelaMesHead: document.querySelector('#tabelaMes thead'),
   tabelaMesBody: document.querySelector('#tabelaMes tbody'),
-  tabButtons: [...document.querySelectorAll('.tab-btn')]
+  tabButtons: [...document.querySelectorAll('.tab-btn')],
+  tabComparacaoBtn: document.getElementById('tabComparacaoBtn'),
+  comparacaoPanel: document.getElementById('comparacaoPanel'),
+  comparacaoResumo: document.getElementById('comparacaoResumo'),
+  tabelaComparacaoHead: document.querySelector('#tabelaComparacao thead'),
+  tabelaComparacaoBody: document.querySelector('#tabelaComparacao tbody')
 };
 
 function setStatus(t){ el.status.textContent = t || ''; }
+function setCompareStatus(t){ if (el.compareStatus) el.compareStatus.textContent = t || ''; }
 function setActiveTab(tab){
   state.activeTab = tab;
   if (el.tabButtons) {
@@ -432,6 +500,786 @@ function minDateOnly(a,b){
 }
 function setComputerDateDisplay(){
   if (el.todayDisplay) el.todayDisplay.value = `${formatDate(todayDateOnly())} ${new Date().toLocaleTimeString('pt-BR')}`;
+}
+function inferDateFromFilename(name){
+  const s = String(name || '');
+  let m = s.match(/(20\d{2})[-_](\d{2})[-_](\d{2})/);
+  if (m) return { y:+m[1], m:+m[2], d:+m[3] };
+  m = s.match(/(\d{2})[-_](\d{2})[-_](20\d{2})/);
+  if (m) return { y:+m[3], m:+m[2], d:+m[1] };
+  return null;
+}
+function fillComparisonDateFromFile(inputEl, dateEl){
+  if (!inputEl || !dateEl || !inputEl.files || !inputEl.files[0]) return;
+  const inferred = inferDateFromFilename(inputEl.files[0].name);
+  if (inferred) dateEl.value = dateOnlyToKey(inferred);
+}
+
+function setDefaultReferenceDate(){
+  const today = todayDateOnly();
+  el.dataReferencia.value = dateOnlyToKey(today);
+}
+function getRequestedReferenceDate(){
+  return dateOnlyFromString(el.dataReferencia.value) || todayDateOnly();
+}
+function busdayCount(startObj,endObj){
+  if (!startObj || !endObj || compareDateOnly(endObj,startObj) <= 0) return 0;
+  let current = new Date(startObj.y, startObj.m-1, startObj.d);
+  const end = new Date(endObj.y, endObj.m-1, endObj.d);
+  let count = 0;
+  while (current < end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) count += 1;
+    current.setDate(current.getDate()+1);
+  }
+  return count;
+}
+function calendarDaysBetween(startObj,endObj){
+  if (!startObj || !endObj) return NaN;
+  const start = new Date(startObj.y, startObj.m-1, startObj.d);
+  const end = new Date(endObj.y, endObj.m-1, endObj.d);
+  return Math.floor((end - start) / 86400000);
+}
+function normalizeBroker(v){
+  const s = String(v ?? '').trim();
+  if (s === 'BTG Pactual') return 'BANCO BTG PACTUAL S.A.';
+  return s;
+}
+function getNumericFromCandidates(row, candidates){
+  for (const key of candidates){
+    const n = toNumber(row[key]);
+    if (Number.isFinite(n)) return n;
+  }
+  return NaN;
+}
+function getPositiveFromCandidates(row, candidates){
+  for (const key of candidates){
+    const n = toNumber(row[key]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return NaN;
+}
+function chooseDisplayedCurrentValue(row){
+  const curveValue = toNumber(row['Valor Atualizado CURVA']);
+  const fechamentoValue = getPositiveFromCandidates(row, [
+    'Valor Atualizado FECHAMENTO','Valor Atualizado Fechamento','Valor Atualizado fechamento',
+    'Valor atualizado fechamento','Valor Fechamento','Valor Atualizado'
+  ]);
+  const curvePrice = toNumber(row['Preço Atualizado CURVA']);
+  const fechamentoPrice = getPositiveFromCandidates(row, [
+    'Preço Atualizado FECHAMENTO','Preço Atualizado Fechamento','Preço Atualizado fechamento',
+    'Preço atualizado fechamento','Preço Fechamento','Preço Atualizado'
+  ]);
+  const qtdDisponivel = toNumber(row['Quantidade Disponível']);
+  const qty = Number.isFinite(qtdDisponivel) && qtdDisponivel > 0 ? qtdDisponivel : toNumber(row['Quantidade']);
+
+  if (Number.isFinite(curveValue) && curveValue > 0){
+    return {
+      value: curveValue,
+      source: 'CURVA',
+      price: (Number.isFinite(curvePrice) && curvePrice > 0) ? curvePrice : (Number.isFinite(qty) && qty > 0 ? curveValue / qty : NaN)
+    };
+  }
+  if (Number.isFinite(fechamentoValue) && fechamentoValue > 0){
+    return {
+      value: fechamentoValue,
+      source: 'FECHAMENTO',
+      price: (Number.isFinite(fechamentoPrice) && fechamentoPrice > 0) ? fechamentoPrice : (Number.isFinite(qty) && qty > 0 ? fechamentoValue / qty : NaN)
+    };
+  }
+  return { value: NaN, source: '', price: NaN };
+}
+function normalizeTextLoose(v){
+  return String(v ?? '').trim().toLowerCase();
+}
+function chooseFaceValue(currentPrice){
+  const cands = [1,100,500,1000];
+  if (!Number.isFinite(currentPrice)) return 1000;
+  return cands.reduce((best,cur)=>Math.abs(cur-currentPrice)<Math.abs(best-currentPrice)?cur:best,cands[0]);
+}
+function chooseLastAvailableDate(series, requestedDate){
+  const eligible = series.filter(r => compareDateOnly(r.data, requestedDate) <= 0);
+  return eligible.length ? eligible[eligible.length-1].data : (series.length ? series[series.length-1].data : null);
+}
+async function readExcel(file, sheetName){
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type:'array', cellDates:true });
+  const actual = wb.Sheets[sheetName] ? sheetName : wb.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[actual], { raw:true, defval:null });
+  return { rows, actualSheet: actual };
+}
+function splitCsvLine(line, delimiter){
+  const out=[]; let cur=''; let q=false;
+  for (let i=0;i<line.length;i++){
+    const ch=line[i];
+    if (ch === '"'){
+      if (q && line[i+1] === '"'){ cur += '"'; i++; }
+      else q = !q;
+    } else if (ch === delimiter && !q){ out.push(cur); cur=''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+function parseCSV(text){
+  const lines = text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return [];
+  const delimiter = lines[0].includes(';') ? ';' : ',';
+  const headers = splitCsvLine(lines[0], delimiter).map(x=>x.trim());
+  return lines.slice(1).map(line => {
+    const parts = splitCsvLine(line, delimiter);
+    const obj={}; headers.forEach((h,i)=>obj[h]=(parts[i]??'').trim()); return obj;
+  });
+}
+async function fetchCsv(path, optional=false){
+  const resp = await fetch(path, { cache:'no-store' });
+  if (!resp.ok){
+    if (optional) return [];
+    throw new Error(`Não foi possível carregar ${path}`);
+  }
+  return parseCSV(await resp.text());
+}
+async function fetchFirstCsv(paths){
+  let lastErr = null;
+  for (const path of paths){
+    try{
+      const rows = await fetchCsv(path);
+      return { rows, path };
+    } catch (err){
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Não foi possível carregar nenhum arquivo de compras.');
+}
+
+function prepareCdi(rows){
+  return rows.map(r => ({
+    data: dateOnlyFromString(r.data),
+    taxa_anual_percentual: toNumber(r.taxa_anual_percentual),
+    taxa_diaria_decimal: Number.isFinite(toNumber(r.taxa_diaria_decimal)) ? toNumber(r.taxa_diaria_decimal) : annualToDaily(toNumber(r.taxa_anual_percentual))
+  })).filter(r => r.data && Number.isFinite(r.taxa_diaria_decimal)).sort((a,b)=>compareDateOnly(a.data,b.data));
+}
+function prepareIpca(rows){
+  const monthlyFieldCandidates = ['ipca_mensal_percentual','ipca_percentual','ipca','valor','percentual'];
+  return rows.map(r => {
+    const data = dateOnlyFromString(r.data);
+    let val = NaN;
+    for (const f of monthlyFieldCandidates) {
+      if (r[f] !== undefined && r[f] !== '') {
+        val = toNumber(r[f]);
+        if (Number.isFinite(val)) break;
+      }
+    }
+    return { data, ipca_mensal_percentual: val };
+  }).filter(r => r.data && Number.isFinite(r.ipca_mensal_percentual)).sort((a,b)=>compareDateOnly(a.data,b.data));
+}
+function prepareCompras(rows){
+  return rows.map(r => ({
+    codigo: String(r.codigo ?? '').trim(),
+    corretora_atual: normalizeBroker(r.corretora_atual),
+    produto_painel: r.produto_painel ?? '',
+    emissor_painel: r.emissor_painel ?? '',
+    data_aquisicao_media: dateOnlyFromString(r.data_aquisicao_media || r.data_primeira_aquisicao_aberta || ''),
+    data_primeira_aquisicao_aberta: dateOnlyFromString(r.data_primeira_aquisicao_aberta || ''),
+    data_ultima_aquisicao_aberta: dateOnlyFromString(r.data_ultima_aquisicao_aberta || ''),
+    quantidade_aberta_historico: toNumber(r.quantidade_aberta_historico),
+    custo_aquisicao_total_aberto: toNumber(r.custo_aquisicao_total_aberto),
+    pu_aquisicao_medio_aberto: toNumber(r.pu_aquisicao_medio_aberto),
+    lotes_abertos: toNumber(r.lotes_abertos),
+    detalhe_lotes_abertos: r.detalhe_lotes_abertos ?? '',
+    status_posicao_compra: r.status_posicao_compra ?? ''
+  })).filter(r => r.codigo);
+}
+function buildComprasMaps(rows){
+  const byCodeBroker = new Map();
+  const byCode = new Map();
+  rows.forEach(r => {
+    byCodeBroker.set(`${r.codigo}||${normalizeBroker(r.corretora_atual)}`, r);
+    if (!byCode.has(r.codigo)) byCode.set(r.codigo, []);
+    byCode.get(r.codigo).push(r);
+  });
+  return { byCodeBroker, byCode };
+}
+function preparePosicao(rows){
+  return rows.map(r => {
+    const row = { ...r };
+    row['Código'] = String(row['Código'] ?? '').trim();
+    row['Instituição'] = normalizeBroker(row['Instituição']);
+    row['Indexador'] = String(row['Indexador'] ?? '').trim().toUpperCase();
+    row['Data de Emissão'] = dateOnlyFromExcel(row['Data de Emissão']);
+    row['Vencimento'] = dateOnlyFromExcel(row['Vencimento']);
+    ['Quantidade','Quantidade Disponível','Preço Atualizado CURVA','Valor Atualizado CURVA'].forEach(c => row[c] = toNumber(row[c]));
+
+    const qtdDisponivel = toNumber(row['Quantidade Disponível']);
+    const qtdTotal = toNumber(row['Quantidade']);
+    row['_quantidadeBase'] = (Number.isFinite(qtdDisponivel) && qtdDisponivel > 0)
+      ? qtdDisponivel
+      : ((Number.isFinite(qtdTotal) && qtdTotal > 0) ? qtdTotal : NaN);
+
+    row['_valorAtualizadoCurvaOriginal'] = row['Valor Atualizado CURVA'];
+    row['_valorAtualizadoFechamento'] = getNumericFromCandidates(row, [
+      'Valor Atualizado FECHAMENTO','Valor Atualizado Fechamento','Valor Atualizado fechamento',
+      'Valor atualizado fechamento','Valor Fechamento','Valor Atualizado'
+    ]);
+    row['_precoAtualizadoFechamento'] = getNumericFromCandidates(row, [
+      'Preço Atualizado FECHAMENTO','Preço Atualizado Fechamento','Preço Atualizado fechamento',
+      'Preço atualizado fechamento','Preço Fechamento','Preço Atualizado'
+    ]);
+    const chosenCurrent = chooseDisplayedCurrentValue(row);
+    row['_origemValorAtualizado'] = chosenCurrent.source;
+    row['Valor Atualizado CURVA'] = chosenCurrent.value;
+    if ((!Number.isFinite(row['Preço Atualizado CURVA']) || row['Preço Atualizado CURVA'] <= 0) && Number.isFinite(chosenCurrent.price)) {
+      row['Preço Atualizado CURVA'] = chosenCurrent.price;
+    }
+    return row;
+  }).filter(r => r['Código'] && Number.isFinite(r['_quantidadeBase']) && r['_quantidadeBase'] > 0);
+}
+
+function cdiSeriesBetween(dfCdi, startDate, endDate){
+  return dfCdi.filter(r => compareDateOnly(r.data, startDate) > 0 && compareDateOnly(r.data, endDate) <= 0);
+}
+function diFactorBetween(dfCdi, startDate, endDate, factor){
+  const arr = cdiSeriesBetween(dfCdi, startDate, endDate);
+  let acc = 1;
+  for (const r of arr) acc *= (1 + factor * r.taxa_diaria_decimal);
+  return acc;
+}
+function ipcaMonthlyFactorBetween(dfIpca, startDate, endDate){
+  if (!dfIpca.length) return NaN;
+  const startKey = startDate.y*100 + startDate.m;
+  const endKey = endDate.y*100 + endDate.m;
+  let acc = 1;
+  let used = 0;
+  for (const r of dfIpca){
+    const key = r.data.y*100 + r.data.m;
+    if (key > startKey && key <= endKey){
+      acc *= (1 + r.ipca_mensal_percentual/100);
+      used += 1;
+    }
+  }
+  return used ? acc : 1;
+}
+function solveBisection(fn, lo, hi){
+  let flo = fn(lo), fhi = fn(hi);
+  let count = 0;
+  while ((!Number.isFinite(flo) || !Number.isFinite(fhi) || flo * fhi > 0) && hi < 50 && count < 20){
+    hi *= 2; fhi = fn(hi); count += 1;
+  }
+  if (!Number.isFinite(flo) || !Number.isFinite(fhi) || flo * fhi > 0) return NaN;
+  for (let i=0;i<120;i++){
+    const mid = (lo+hi)/2;
+    const fmid = fn(mid);
+    if (!Number.isFinite(fmid)) return NaN;
+    if (Math.abs(fmid) < 1e-10 || Math.abs(hi-lo) < 1e-10) return mid;
+    if (flo * fmid <= 0){ hi = mid; } else { lo = mid; flo = fmid; }
+  }
+  return (lo+hi)/2;
+}
+function estimatePanelRate(row, dfCdi, dfIpca, refDates){
+  const price = row['Preço Atualizado CURVA'];
+  const issue = row['Data de Emissão'];
+  if (!Number.isFinite(price) || !issue) return { label:'-', raw:NaN, effectiveRefDate:null };
+  const face = chooseFaceValue(price);
+
+  if (row['Indexador'] === 'DI'){
+    const refDate = refDates.cdi;
+    if (!refDate || compareDateOnly(refDate, issue) <= 0) return { label:'-', raw:NaN, effectiveRefDate:refDate };
+    const f = solveBisection(x => face * diFactorBetween(dfCdi, issue, refDate, x) - price, 0, 3);
+    return { label: Number.isFinite(f) ? `${brPct(f*100,2)} CDI` : '-', raw:f, effectiveRefDate:refDate };
+  }
+  if (row['Indexador'] === 'PREFIXADO'){
+    const refDate = refDates.requested;
+    if (!refDate || compareDateOnly(refDate, issue) <= 0) return { label:'-', raw:NaN, effectiveRefDate:refDate };
+    const du = busdayCount(issue, refDate);
+    if (du <= 0) return { label:'-', raw:NaN, effectiveRefDate:refDate };
+    const annual = Math.pow(price/face, 252/du) - 1;
+    return { label: Number.isFinite(annual) ? `${brPct(annual*100,2)} a.a.` : '-', raw:annual, effectiveRefDate:refDate };
+  }
+  if (row['Indexador'] === 'IPCA'){
+    const refDate = refDates.ipca || refDates.requested;
+    if (!refDate || compareDateOnly(refDate, issue) <= 0) return { label:'-', raw:NaN, effectiveRefDate:refDate };
+    const infl = ipcaMonthlyFactorBetween(dfIpca, issue, refDate);
+    const du = busdayCount(issue, refDate);
+    if (!Number.isFinite(infl) || du <= 0 || infl <= 0) return { label:'-', raw:NaN, effectiveRefDate:refDate };
+    const annual = Math.pow(price/(face*infl), 252/du) - 1;
+    return { label: Number.isFinite(annual) ? `IPCA + ${brPct(annual*100,2)}` : '-', raw:annual, effectiveRefDate:refDate };
+  }
+  return { label:'-', raw:NaN, effectiveRefDate:null };
+}
+function estimateSecondaryRate(row, acq, dfCdi, dfIpca){
+  if (!acq || !acq.data_aquisicao_media || !Number.isFinite(acq.pu_aquisicao_medio_aberto) || acq.pu_aquisicao_medio_aberto <= 0) {
+    return { label:'-', raw:NaN };
+  }
+  const pu = acq.pu_aquisicao_medio_aberto;
+  const issue = row['Data de Emissão'];
+  const acqDate = acq.data_aquisicao_media;
+  if (!issue || compareDateOnly(acqDate, issue) <= 0) return { label:'-', raw:NaN };
+  const face = chooseFaceValue(row['Preço Atualizado CURVA']);
+  if (row['Indexador'] === 'DI'){
+    const f = solveBisection(x => face * diFactorBetween(dfCdi, issue, acqDate, x) - pu, 0, 3);
+    return { label: Number.isFinite(f) ? `${brPct(f*100,2)} CDI` : '-', raw:f };
+  }
+  if (row['Indexador'] === 'PREFIXADO'){
+    const du = busdayCount(issue, acqDate);
+    if (du <= 0) return { label:'-', raw:NaN };
+    const annual = Math.pow(pu/face, 252/du) - 1;
+    return { label: Number.isFinite(annual) ? `${brPct(annual*100,2)} a.a.` : '-', raw:annual };
+  }
+  if (row['Indexador'] === 'IPCA'){
+    const infl = ipcaMonthlyFactorBetween(dfIpca, issue, acqDate);
+    const du = busdayCount(issue, acqDate);
+    if (!Number.isFinite(infl) || du <= 0 || infl <= 0) return { label:'-', raw:NaN };
+    const annual = Math.pow(pu/(face*infl), 252/du) - 1;
+    return { label: Number.isFinite(annual) ? `IPCA + ${brPct(annual*100,2)}` : '-', raw:annual };
+  }
+  return { label:'-', raw:NaN };
+}
+function project12m(row, panelRate, refDate, cdiFuturePct, ipcaFuturePct, considerMaturity){
+  const currentTotalValue = toNumber(row['Valor Atualizado CURVA']);
+  const currentUnitPrice = toNumber(row['Preço Atualizado CURVA']);
+  const qtyAvailable = toNumber(row['Quantidade Disponível']);
+  const qty = Number.isFinite(qtyAvailable) && qtyAvailable > 0 ? qtyAvailable : toNumber(row['Quantidade']);
+  const projectionBase = Number.isFinite(currentTotalValue) && currentTotalValue > 0
+    ? currentTotalValue
+    : ((Number.isFinite(currentUnitPrice) && currentUnitPrice > 0 && Number.isFinite(qty) && qty > 0) ? currentUnitPrice * qty : NaN);
+  if (!Number.isFinite(projectionBase) || !refDate) return NaN;
+  let endDate = addMonthsDateOnly(refDate, 12);
+  if (considerMaturity && row['Vencimento'] && compareDateOnly(row['Vencimento'], endDate) < 0) endDate = row['Vencimento'];
+  const du = busdayCount(refDate, endDate);
+  if (du <= 0) return projectionBase;
+  if (row['Indexador'] === 'DI' && Number.isFinite(panelRate.raw)){
+    const daily = annualToDaily(cdiFuturePct);
+    return projectionBase * Math.pow(1 + panelRate.raw * daily, du);
+  }
+  if (row['Indexador'] === 'PREFIXADO' && Number.isFinite(panelRate.raw)){
+    return projectionBase * Math.pow(1 + panelRate.raw, du/252);
+  }
+  if (row['Indexador'] === 'IPCA' && Number.isFinite(panelRate.raw)){
+    const ipcaDaily = annualToDaily(ipcaFuturePct);
+    return projectionBase * Math.pow((1 + ipcaDaily) * Math.pow(1 + panelRate.raw, 1/252), du);
+  }
+  return projectionBase;
+}
+
+const IOF_REGRESSIVE_TABLE = {
+  1:0.96, 2:0.93, 3:0.90, 4:0.86, 5:0.83, 6:0.80, 7:0.76, 8:0.73, 9:0.70,
+  10:0.66, 11:0.63, 12:0.60, 13:0.56, 14:0.53, 15:0.50, 16:0.46, 17:0.43, 18:0.40,
+  19:0.36, 20:0.33, 21:0.30, 22:0.26, 23:0.23, 24:0.20, 25:0.16, 26:0.13, 27:0.10,
+  28:0.06, 29:0.03, 30:0
+};
+const TAX_PROXY_START = { y:2025, m:10, d:1 };
+
+function normalizeTextTax(v){
+  return String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+}
+function getTaxProfile(row){
+  const text = normalizeTextTax([row['Produto painel'] || row['Produto'] || '', row['Código'] || ''].join(' '));
+  if (text.includes('LCA')) return { type:'LCA', hasIR:false, hasIOF:false };
+  if (text.includes('LCI')) return { type:'LCI', hasIR:false, hasIOF:true };
+  return { type:'OUTROS', hasIR:true, hasIOF:true };
+}
+function getIrRateByDays(daysHeld, hasAcquisitionDate){
+  if (!hasAcquisitionDate || !Number.isFinite(daysHeld)) return 0.225;
+  if (daysHeld <= 180) return 0.225;
+  if (daysHeld <= 360) return 0.20;
+  if (daysHeld <= 720) return 0.175;
+  return 0.15;
+}
+function getIofRateByDays(daysHeld){
+  if (!Number.isFinite(daysHeld)) return 0;
+  if (daysHeld >= 30) return 0;
+  if (daysHeld <= 0) return IOF_REGRESSIVE_TABLE[1];
+  const d = Math.max(1, Math.floor(daysHeld));
+  return IOF_REGRESSIVE_TABLE[d] ?? 0;
+}
+function estimateNetValue(grossValue, costValue, acquisitionDate, resgateDate, taxProfile, options = {}){
+  if (!Number.isFinite(grossValue)) {
+    return { net: NaN, gross: NaN, gain: NaN, iofValue: NaN, irValue: NaN, totalTax: NaN, daysHeld: NaN, irRate: NaN, iofRate: NaN, proxyUsed:false };
+  }
+  const effectiveCost = Number.isFinite(options.proxyCostValue) ? options.proxyCostValue : costValue;
+  const effectiveAcquisitionDate = options.proxyAcquisitionDate || acquisitionDate;
+  const proxyUsed = Number.isFinite(options.proxyCostValue) && !Number.isFinite(costValue);
+  const cost = Number.isFinite(effectiveCost) ? effectiveCost : 0;
+  const gain = Math.max(0, grossValue - cost);
+  const daysHeld = Number.isFinite(calendarDaysBetween(effectiveAcquisitionDate, resgateDate)) ? calendarDaysBetween(effectiveAcquisitionDate, resgateDate) : NaN;
+  if (gain <= 0) {
+    return { net: grossValue, gross: grossValue, gain, iofValue: 0, irValue: 0, totalTax: 0, daysHeld, irRate: 0, iofRate: 0, proxyUsed };
+  }
+  const iofAllowed = taxProfile.hasIOF && !!acquisitionDate && !options.disableIOF;
+  const iofRate = iofAllowed ? getIofRateByDays(daysHeld) : 0;
+  const iofValue = gain * iofRate;
+  const irRate = taxProfile.hasIR ? getIrRateByDays(daysHeld, !!effectiveAcquisitionDate) : 0;
+  const irBase = Math.max(0, gain - iofValue);
+  const irValue = irBase * irRate;
+  const totalTax = iofValue + irValue;
+  const net = grossValue - totalTax;
+  return { net, gross: grossValue, gain, iofValue, irValue, totalTax, daysHeld, irRate, iofRate, proxyUsed };
+}
+
+function estimateProxyTaxBase(row, panelRate, dfCdi, dfIpca, refDates, resgateDate){
+  const qty = row['_quantidadeBase'];
+  if (!(Number.isFinite(qty) && qty > 0)) return null;
+  if (!row['Data de Emissão'] || !Number.isFinite(panelRate.raw)) return null;
+  const puCurrent = Number.isFinite(row['Preço Atualizado CURVA']) && row['Preço Atualizado CURVA'] > 0
+    ? row['Preço Atualizado CURVA']
+    : (Number.isFinite(row['Valor Atualizado CURVA']) && row['Valor Atualizado CURVA'] > 0 ? row['Valor Atualizado CURVA'] / qty : NaN);
+  if (!Number.isFinite(puCurrent) || puCurrent <= 0) return null;
+  const face = chooseFaceValue(puCurrent);
+  const proxyDate = compareDateOnly(row['Data de Emissão'], TAX_PROXY_START) > 0 ? row['Data de Emissão'] : TAX_PROXY_START;
+  if (compareDateOnly(resgateDate, proxyDate) <= 0) return null;
+  let proxyPU = NaN;
+  if (row['Indexador'] === 'DI') {
+    proxyPU = face * diFactorBetween(dfCdi, row['Data de Emissão'], proxyDate, panelRate.raw);
+  } else if (row['Indexador'] === 'PREFIXADO') {
+    const du = busdayCount(row['Data de Emissão'], proxyDate);
+    proxyPU = face * Math.pow(1 + panelRate.raw, du / 252);
+  } else if (row['Indexador'] === 'IPCA') {
+    const infl = ipcaMonthlyFactorBetween(dfIpca, row['Data de Emissão'], proxyDate);
+    const du = busdayCount(row['Data de Emissão'], proxyDate);
+    if (Number.isFinite(infl)) {
+      proxyPU = face * infl * Math.pow(1 + panelRate.raw, du / 252);
+    }
+  }
+  if (!(Number.isFinite(proxyPU) && proxyPU > 0)) return null;
+  return {
+    proxyDate,
+    faceValue: face,
+    proxyPU,
+    proxyCostValue: proxyPU * qty,
+    source: 'proxy_2025_10_01'
+  };
+}
+
+function aggregateTotals(rows){
+  const totalCurve = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor Atualizado CURVA'])?r['Valor Atualizado CURVA']:0),0);
+  const totalCurveLiquid = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor Atualizado CURVA líquido'])?r['Valor Atualizado CURVA líquido']:0),0);
+  const totalAq = rows.reduce((a,r)=>a+(Number.isFinite(r['Custo aquisição'])?r['Custo aquisição']:0),0);
+  const diff = totalCurve - totalAq;
+  const diffPct = totalAq ? diff/totalAq*100 : NaN;
+  const taxCurrent = totalCurve - totalCurveLiquid;
+  const missingCost = rows.filter(r => !(Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0)).length;
+  const duplicatedCodes = rows.filter(r => r['_codigoDuplicado']).length;
+  const projectedWith = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m com vencimento'])?r['Valor projetado 12m com vencimento']:0),0);
+  const projectedWithLiquid = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m com vencimento líquido'])?r['Valor projetado 12m com vencimento líquido']:0),0);
+  const projectedNo = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m sem vencimento'])?r['Valor projetado 12m sem vencimento']:0),0);
+  const projectedNoLiquid = rows.reduce((a,r)=>a+(Number.isFinite(r['Valor projetado 12m sem vencimento líquido'])?r['Valor projetado 12m sem vencimento líquido']:0),0);
+  const conservativeIrRows = rows.filter(r => r['_taxConservativeIr']).length;
+  return { totalCurve, totalCurveLiquid, totalAq, diff, diffPct, taxCurrent, missingCost, duplicatedCodes, projectedWith, projectedWithLiquid, projectedNo, projectedNoLiquid, conservativeIrRows };
+}
+function card(label, value, sub=''){
+  return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
+}
+function renderSummary(rows){
+  el.sumario.classList.remove('hidden');
+  const t = aggregateTotals(rows);
+  const html = [
+    card('Linhas no recorte', String(rows.length), `Data de referência solicitada: ${formatDate(state.refDateRequested)}`),
+    card('Aquisição conhecida', `R$ ${brNumber(t.totalAq)}`, 'Somatório do custo de aquisição com fallback subsidiário por código quando não há match por corretora'),
+    card('Valor na curva', `R$ ${brNumber(t.totalCurve)}`, 'Somatório bruto do valor atualizado na curva do recorte'),
+    card('Valor na curva líquido', `R$ ${brNumber(t.totalCurveLiquid)}`, 'Valor líquido estimado na data de referência, após IR/IOF conforme o tipo do papel'),
+    card('Diferença absoluta', `R$ ${brNumber(t.diff)}`, 'Curva bruta menos aquisição conhecida'),
+    card('Diferença percentual', brPct(t.diffPct), 'Diferença percentual sobre a aquisição conhecida'),
+    card('Tributação estimada hoje', `R$ ${brNumber(t.taxCurrent)}`, 'Diferença entre o valor bruto e o valor líquido na data de referência'),
+    card('Sem custo informado', String(t.missingCost), 'Quantidade de ativos que podem ser exportados no CSV auxiliar'),
+    card('Códigos duplicados', String(t.duplicatedCodes), 'Linhas do recorte com código repetido no painel'),
+    card('IR conservador por falta de data', String(t.conservativeIrRows), 'Linhas em que, mesmo sem data/custo, não foi possível usar a proxy tributária'),
+    card('Projeção 12m com vencimento', `R$ ${brNumber(t.projectedWith)}`, 'Projeção bruta sobre o valor total atual das posições, limitada ao vencimento quando aplicável'),
+    card('Projeção 12m com vencimento líquido', `R$ ${brNumber(t.projectedWithLiquid)}`, 'Projeção líquida considerando IR/IOF e o custo de aquisição'),
+    card('Projeção 12m sem vencimento', `R$ ${brNumber(t.projectedNo)}`, 'Projeção bruta sobre o valor total atual das posições, sem truncar no vencimento'),
+    card('Projeção 12m sem vencimento líquido', `R$ ${brNumber(t.projectedNoLiquid)}`, 'Projeção líquida considerando IR/IOF e o custo de aquisição')
+  ].join('');
+  el.sumario.innerHTML = html;
+  el.sumario.classList.remove('hidden');
+}
+function populateEmitterFilters(rows){
+  const emissores = [...new Set(rows.map(r=>r['Emissor painel']).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR'));
+  const opts = emissores.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join('');
+  el.filtroEmissorIncluir.innerHTML = opts;
+  el.filtroEmissorExcluir.innerHTML = opts;
+  el.filtros.classList.remove('hidden');
+}
+function getSelectedValues(selectEl){
+  return [...selectEl.selectedOptions].map(o => o.value);
+}
+function compareVals(a,b){
+  const an = Number(a), bn = Number(b);
+  if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  return String(a ?? '').localeCompare(String(b ?? ''),'pt-BR');
+}
+function getFixType(indexador){
+  return indexador === 'PREFIXADO' ? 'PREFIXADO' : 'POS-FIXADO';
+}
+function computeCompositionTimeline(rows, refDate){
+  const validRows = rows.filter(r => Number.isFinite(r['Valor Atualizado CURVA']) && r['Valor Atualizado CURVA'] > 0);
+  if (!validRows.length || !refDate) return [];
+  const validMaturities = validRows.map(r => r['Vencimento painel']).filter(Boolean);
+  if (!validMaturities.length) {
+    const prefixado = validRows.filter(r => getFixType(r['Indexador']) === 'PREFIXADO').reduce((a,r)=>a+r['Valor Atualizado CURVA'],0);
+    const pos = validRows.filter(r => getFixType(r['Indexador']) !== 'PREFIXADO').reduce((a,r)=>a+r['Valor Atualizado CURVA'],0);
+    const total = prefixado + pos;
+    return [{ mes:firstDayOfMonthDateOnly(refDate), prefixado, pos, total, pctPrefixado: total ? prefixado/total*100 : 0, pctPos: total ? pos/total*100 : 0 }];
+  }
+
+  let end = validMaturities.reduce((best,cur)=>!best || compareDateOnly(cur,best) > 0 ? cur : best, null);
+  let cursor = firstDayOfMonthDateOnly(refDate);
+  const limit = firstDayOfMonthDateOnly(end);
+  const out = [];
+  let guard = 0;
+
+  while (compareDateOnly(cursor, limit) <= 0 && guard < 240) {
+    const cutoff = endOfMonthDateOnly(cursor);
+    let prefixado = 0;
+    let pos = 0;
+    for (const r of validRows){
+      const venc = r['Vencimento painel'];
+      const ativoAindaExiste = !venc || compareDateOnly(venc, cutoff) >= 0;
+      if (!ativoAindaExiste) continue;
+      if (getFixType(r['Indexador']) === 'PREFIXADO') prefixado += r['Valor Atualizado CURVA'];
+      else pos += r['Valor Atualizado CURVA'];
+    }
+    const total = prefixado + pos;
+    if (total > 0) {
+      out.push({
+        mes: { ...cursor },
+        prefixado,
+        pos,
+        total,
+        pctPrefixado: prefixado/total*100,
+        pctPos: pos/total*100
+      });
+    }
+    cursor = addMonthsDateOnly(cursor, 1);
+    cursor.d = 1;
+    guard += 1;
+  }
+  return out;
+}
+function renderComposition(rows){
+  el.composicaoTemporal.classList.remove('hidden');
+  const timeline = computeCompositionTimeline(rows, state.refDateRequested);
+  state.composicaoTimeline = timeline;
+  if (!timeline.length){
+    el.composicaoTemporal.classList.add('hidden');
+    el.timelineBars.innerHTML = '';
+    el.tabelaComposicaoHead.innerHTML = '';
+    el.tabelaComposicaoBody.innerHTML = '';
+    return;
+  }
+  el.composicaoTemporal.classList.remove('hidden');
+  el.timelineBars.innerHTML = timeline.map(item => `
+    <div class="timeline-row">
+      <div class="mes">${escapeHtml(formatMonthLabel(item.mes))}</div>
+      <div class="bar-track">
+        <div class="bar-prefix" style="width:${item.pctPrefixado.toFixed(4)}%"></div>
+        <div class="bar-pos" style="width:${item.pctPos.toFixed(4)}%"></div>
+      </div>
+      <div class="pct">${brPct(item.pctPrefixado,1)} / ${brPct(item.pctPos,1)}</div>
+    </div>
+  `).join('');
+
+  const cols = ['Mês','Prefixado (R$)','Pós-fixado (R$)','% Prefixado','% Pós-fixado','Total (R$)'];
+  el.tabelaComposicaoHead.innerHTML = `<tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
+  el.tabelaComposicaoBody.innerHTML = timeline.map(item => `
+    <tr>
+      <td>${escapeHtml(formatMonthLabel(item.mes))}</td>
+      <td class="right">R$ ${brNumber(item.prefixado)}</td>
+      <td class="right">R$ ${brNumber(item.pos)}</td>
+      <td class="right">${brPct(item.pctPrefixado)}</td>
+      <td class="right">${brPct(item.pctPos)}</td>
+      <td class="right">R$ ${brNumber(item.total)}</td>
+    </tr>
+  `).join('');
+}
+function applyFilters(){
+  const busca = (el.filtroBusca.value || '').toLowerCase().trim();
+  const idx = el.filtroIndexador.value || '';
+  const incl = new Set(getSelectedValues(el.filtroEmissorIncluir));
+  const excl = new Set(getSelectedValues(el.filtroEmissorExcluir));
+  let rows = [...state.dfResultado];
+  if (busca){
+    rows = rows.filter(r => [
+      r['Produto painel'], r['Código'], r['Emissor painel'], r['Corretora painel']
+    ].some(v => String(v ?? '').toLowerCase().includes(busca)));
+  }
+  if (idx) rows = rows.filter(r => r['Indexador'] === idx);
+  if (incl.size) rows = rows.filter(r => incl.has(r['Emissor painel']));
+  if (excl.size) rows = rows.filter(r => !excl.has(r['Emissor painel']));
+  const dir = state.sortDirection === 'desc' ? -1 : 1;
+  rows.sort((a,b) => compareVals(a[state.sortColumn], b[state.sortColumn]) * dir);
+  state.filtered = rows;
+  renderSummary(rows);
+  renderMainTable(rows);
+  renderCronograma(rows);
+  renderComposition(rows);
+  updateMissingCostButtonState();
+  showTabbedPanels();
+}
+function getRowClass(row){
+  const dup = !!row['_codigoDuplicado'];
+  const miss = !(Number.isFinite(row['Custo aquisição']) && row['Custo aquisição'] > 0);
+  if (dup && miss) return 'row-both';
+  if (dup) return 'row-duplicate';
+  if (miss) return 'row-missing-cost';
+  return '';
+}
+function getRowFlagsHtml(row){
+  const flags = [];
+  if (row['_codigoDuplicado']) flags.push('<span class="flag-chip dup">Código duplicado</span>');
+  if (!(Number.isFinite(row['Custo aquisição']) && row['Custo aquisição'] > 0)) flags.push('<span class="flag-chip miss">Sem custo</span>');
+  return flags.length ? `<div class="cell-flags">${flags.join('')}</div>` : '';
+}
+function renderMainTable(rows){
+  el.posicoesPanel.classList.remove('hidden');
+  el.tabelaMainHead.innerHTML = `<tr>${TABLE_COLUMNS.map(c => `<th data-col="${escapeHtml(c)}">${escapeHtml(c)}</th>`).join('')}</tr>`;
+  el.tabelaMainBody.innerHTML = rows.map(r => `<tr class="${getRowClass(r)}">${TABLE_COLUMNS.map(c => renderCell(c, r[c], c === 'Produto painel' ? r : null)).join('')}</tr>`).join('');
+  el.tabelaMainHead.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', ()=>{
+      const col = th.dataset.col;
+      if (state.sortColumn === col) state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+      else { state.sortColumn = col; state.sortDirection = 'asc'; }
+      applyFilters();
+    });
+  });
+}
+function renderCell(col, val, row=null){
+  if (NUMERIC_COLUMNS.has(col)) return `<td class="right">${Number.isFinite(val) ? 'R$ ' + brNumber(val) : '-'}</td>`;
+  if (col === 'Taxa painel' || col === 'Taxa compra secundário') return `<td>${escapeHtml(val || '-')}</td>`;
+  if (col === 'Emissão painel' || col === 'Vencimento painel' || col === 'Data aquisição') return `<td>${formatDate(val)}</td>`;
+  if (col === 'Produto painel' && row) return `<td><div>${escapeHtml(val ?? '-')}</div>${getRowFlagsHtml(row)}</td>`;
+  return `<td>${escapeHtml(val ?? '-')}</td>`;
+}
+function monthKey(dateObj){ return dateObj ? `${dateObj.y}-${String(dateObj.m).padStart(2,'0')}` : ''; }
+function renderCronograma(rows){
+  el.vencimentosPanel.classList.remove('hidden');
+  const groups = new Map();
+  for (const r of rows){
+    const venc = r['Vencimento painel'];
+    if (!venc) continue;
+    const key = monthKey(venc);
+    if (!groups.has(key)) groups.set(key,{ mes:key, quantidade:0, totalCurva:0, itens:[] });
+    const g = groups.get(key);
+    g.quantidade += 1;
+    g.totalCurva += Number.isFinite(r['Valor Atualizado CURVA']) ? r['Valor Atualizado CURVA'] : 0;
+    g.itens.push(r);
+  }
+  const arr = [...groups.values()].sort((a,b)=>a.mes.localeCompare(b.mes));
+  el.tabelaCronogramaHead.innerHTML = '<tr><th>Mês</th><th>Qtd.</th><th>Total na curva</th></tr>';
+  if (!arr.length){
+    el.tabelaCronogramaBody.innerHTML = '<tr><td colspan="3" class="muted">Nenhum vencimento no recorte atual.</td></tr>';
+    renderMesSelecionado(null);
+    return;
+  }
+  el.tabelaCronogramaBody.innerHTML = arr.map(g => `<tr class="cron-row" data-mes="${g.mes}" style="cursor:pointer"><td>${escapeHtml(g.mes)}</td><td class="right">${g.quantidade}</td><td class="right">R$ ${brNumber(g.totalCurva)}</td></tr>`).join('');
+  const rowsEls = [...el.tabelaCronogramaBody.querySelectorAll('tr.cron-row')];
+  rowsEls.forEach(tr => {
+    tr.addEventListener('click', ()=>{
+      rowsEls.forEach(x => x.style.background = '');
+      tr.style.background = 'rgba(92,156,255,.12)';
+      const g = arr.find(x => x.mes === tr.dataset.mes);
+      renderMesSelecionado(g);
+    });
+  });
+  rowsEls[0].click();
+}
+function renderMesSelecionado(g){
+  if (!g){
+    el.cronogramaTitulo.textContent = 'Ativos do mês selecionado';
+    el.tabelaMesHead.innerHTML='';
+    el.tabelaMesBody.innerHTML='';
+    return;
+  }
+  el.cronogramaTitulo.textContent = `Ativos a vencer em ${g.mes}`;
+  const cols = ['Produto painel','Corretora painel','Emissor painel','Código','Vencimento painel','Valor Atualizado CURVA'];
+  el.tabelaMesHead.innerHTML = `<tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
+  const itens = [...g.itens].sort((a,b)=>compareVals(a['Vencimento painel'] ? dateOnlyToKey(a['Vencimento painel']) : '', b['Vencimento painel'] ? dateOnlyToKey(b['Vencimento painel']) : ''));
+  el.tabelaMesBody.innerHTML = itens.map(r => `<tr class="${getRowClass(r)}">${cols.map(c => renderCell(c,r[c], c === 'Produto painel' ? r : null)).join('')}</tr>`).join('');
+}
+function aggregateForComparison(dfPos){
+  const groups = new Map();
+  dfPos.filter(r => ['DI','PREFIXADO','IPCA'].includes(r['Indexador'])).forEach(row => {
+    const code = row['Código'];
+    if (!code) return;
+    const qtyAvail = toNumber(row['Quantidade Disponível']);
+    const qtyRaw = Number.isFinite(qtyAvail) && qtyAvail > 0 ? qtyAvail : toNumber(row['Quantidade']);
+    const qty = Number.isFinite(qtyRaw) ? qtyRaw : NaN;
+    const currentInfo = chooseDisplayedCurrentValue(row);
+    const unitPrice = Number.isFinite(currentInfo.price) ? currentInfo.price : toNumber(row['Preço Atualizado CURVA']);
+    const totalValue = Number.isFinite(currentInfo.value) ? currentInfo.value : ((Number.isFinite(unitPrice) && Number.isFinite(qty)) ? unitPrice * qty : NaN);
+    if (!groups.has(code)) {
+      groups.set(code, { 'Código': code, 'Produto': row['Produto'] || code, 'Emissor': row['Emissor'] || '', 'Indexador': row['Indexador'] || '', brokers: new Set(), qty: 0, totalValue: 0 });
+    }
+    const g = groups.get(code);
+    g.brokers.add(normalizeBroker(row['Instituição']));
+    if (Number.isFinite(qty) && qty > 0) g.qty += qty;
+    if (Number.isFinite(totalValue) && totalValue > 0) g.totalValue += totalValue;
+    if (!g['Produto'] && row['Produto']) g['Produto'] = row['Produto'];
+    if (!g['Emissor'] && row['Emissor']) g['Emissor'] = row['Emissor'];
+    if (!g['Indexador'] && row['Indexador']) g['Indexador'] = row['Indexador'];
+  });
+  const out = new Map();
+  for (const [code, g] of groups.entries()) {
+    const unitPrice = (Number.isFinite(g.qty) && g.qty > 0 && Number.isFinite(g.totalValue) && g.totalValue > 0) ? g.totalValue / g.qty : NaN;
+    out.set(code, { 'Código': code, 'Produto': g['Produto'], 'Emissor': g['Emissor'], 'Indexador': g['Indexador'], 'Corretoras': [...g.brokers].filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b), 'pt-BR')).join(' | '), qty: g.qty, totalValue: g.totalValue, unitPrice });
+  }
+  return out;
+}
+function computeComparisonRows(mapInicial, mapFinal, dataInicial, dataFinal){
+  const rows = [];
+  const dias = calendarDaysBetween(dataInicial, dataFinal);
+  for (const [code, ini] of mapInicial.entries()) {
+    if (!mapFinal.has(code)) continue;
+    const fim = mapFinal.get(code);
+    if (!(Number.isFinite(ini.qty) && ini.qty > 0)) continue;
+    if (!(Number.isFinite(ini.unitPrice) && Number.isFinite(fim.unitPrice))) continue;
+    const qtyBase = ini.qty;
+    const valorInicial = ini.unitPrice * qtyBase;
+    const valorFinal = fim.unitPrice * qtyBase;
+    const rendimentoTotal = valorFinal - valorInicial;
+    const rendimentoPct = valorInicial ? rendimentoTotal / valorInicial * 100 : NaN;
+    const rendimentoMensal = (valorInicial > 0 && valorFinal > 0 && Number.isFinite(dias) && dias > 0) ? (Math.pow(valorFinal / valorInicial, 30.4375 / dias) - 1) * 100 : NaN;
+    rows.push({ 'Produto': ini['Produto'] || fim['Produto'] || code, 'Emissor': ini['Emissor'] || fim['Emissor'] || '', 'Código': code, 'Indexador': ini['Indexador'] || fim['Indexador'] || '', 'Corretoras inicial': ini['Corretoras'] || '-', 'Corretoras final': fim['Corretoras'] || '-', 'Quantidade inicial': ini.qty, 'Quantidade final': fim.qty, 'Quantidade usada': qtyBase, 'Preço curva inicial': ini.unitPrice, 'Preço curva final': fim.unitPrice, 'Valor inicial comparável': valorInicial, 'Valor final comparável': valorFinal, 'Rendimento total': rendimentoTotal, 'Rendimento %': rendimentoPct, 'Rendimento mensal equivalente': rendimentoMensal, '_mudouQuantidade': Math.abs((fim.qty || 0) - (ini.qty || 0)) > 1e-9 });
+  }
+  rows.sort((a,b) => compareVals(a['Produto'], b['Produto']));
+  return rows;
+}
+function aggregateComparisonTotals(rows, dataInicial, dataFinal){
+  const valorInicial = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor inicial comparável']) ? r['Valor inicial comparável'] : 0), 0);
+  const valorFinal = rows.reduce((a,r)=>a + (Number.isFinite(r['Valor final comparável']) ? r['Valor final comparável'] : 0), 0);
+  const rendimentoTotal = valorFinal - valorInicial;
+  const rendimentoPct = valorInicial ? rendimentoTotal / valorInicial * 100 : NaN;
+  const dias = calendarDaysBetween(dataInicial, dataFinal);
+  const rendimentoMensal = (valorInicial > 0 && valorFinal > 0 && Number.isFinite(dias) && dias > 0) ? (Math.pow(valorFinal / valorInicial, 30.4375 / dias) - 1) * 100 : NaN;
+  return { codigosComparados: rows.length, codigosComMudancaQuantidade: rows.filter(r => r._mudouQuantidade).length, valorInicial, valorFinal, rendimentoTotal, rendimentoPct, rendimentoMensal, dias };
+}
+function renderComparisonPanel(rows, meta){
+  state.comparisonRows = rows;
+  state.comparisonMeta = meta;
+  if (el.tabComparacaoBtn) el.tabComparacaoBtn.classList.remove('hidden');
+  el.comparacaoPanel.classList.remove('hidden');
+  if (!rows.length) {
+    el.comparacaoResumo.innerHTML = card('Códigos comparados', '0', 'Nenhum código em comum com dados válidos nas duas planilhas.');
+    el.tabelaComparacaoHead.innerHTML = '';
+    el.tabelaComparacaoBody.innerHTML = '<tr><td class="muted">Nenhuma linha para exibir.</td></tr>';
+    return;
+  }
+  const t = aggregateComparisonTotals(rows, meta.dataInicial, meta.dataFinal);
+  el.comparacaoResumo.innerHTML = [
+    card('Códigos comparados', String(t.codigosComparados), `Janela: ${formatDate(meta.dataInicial)} → ${formatDate(meta.dataFinal)} (${t.dias} dias)`),
+    card('Valor inicial comparável', `R$ ${brNumber(t.valorInicial)}`, 'Preço Atualizado CURVA × quantidade do período inicial'),
+    card('Valor final comparável', `R$ ${brNumber(t.valorFinal)}`, 'Preço Atualizado CURVA final × quantidade do período inicial'),
+    card('Rendimento total', `R$ ${brNumber(t.rendimentoTotal)}`, brPct(t.rendimentoPct)),
+    card('Rendimento mensal', brPct(t.rendimentoMensal), 'Equivalente mensal implícito entre as duas datas'),
+    card('Qtd. com mudança de quantidade', String(t.codigosComMudancaQuantidade), 'A comparação continua limitada pela quantidade do período inicial')
+  ].join('');
+  el.tabelaComparacaoHead.innerHTML = `<tr>${COMPARISON_COLUMNS.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
+  el.tabelaComparacaoBody.innerHTML = rows.map(r => `<tr>${COMPARISON_COLUMNS.map(c => renderComparisonCell(c, r[c], r)).join('')}</tr>`).join('');
+}
+function renderComparisonCell(col, val, row){
+  if (['Quantidade inicial','Quantidade final','Quantidade usada'].includes(col)) return `<td class="right">${Number.isFinite(val) ? brNumber(val,0) : '-'}</td>`;
+  if (['Preço curva inicial','Preço curva final','Valor inicial comparável','Valor final comparável','Rendimento total'].includes(col)) return `<td class="right">${Number.isFinite(val) ? 'R$ ' + brNumber(val) : '-'}</td>`;
+  if (['Rendimento %','Rendimento mensal equivalente'].includes(col)) return `<td class="right">${Number.isFinite(val) ? brPct(val) : '-'}</td>`;
+  if (col === 'Produto') return `<td>${escapeHtml(val ?? '-')} ${row && row._mudouQuantidade ? '<span class="flag-chip dup" style="margin-left:6px;">Qtd. mudou</span>' : ''}</td>`;
+  return `<td>${escapeHtml(val ?? '-')}</td>`;
 }
 function setDefaultReferenceDate(){
   const today = todayDateOnly();
@@ -1135,6 +1983,9 @@ function exportExcel(){
     pct_pos_fixado: x.pctPos,
     total: x.total
   }))), 'Composicao');
+  if (state.comparisonRows && state.comparisonRows.length) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.comparisonRows), 'Comparacao');
+  }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(missingRows), 'SemCustoTemplate');
   XLSX.writeFile(wb, 'painel_renda_fixa_corretora.xlsx');
 }
@@ -1154,6 +2005,8 @@ function clearAll(){
   state.cdiRefDate = null;
   state.ipcaRefDate = null;
   state.activeTab = 'resumo';
+  state.comparisonRows=[];
+  state.comparisonMeta=null;
   el.arquivoPosicao.value='';
   el.filtroBusca.value='';
   el.filtroIndexador.value='';
@@ -1161,6 +2014,11 @@ function clearAll(){
   [...el.filtroEmissorExcluir.options].forEach(o => o.selected = false);
   el.btnExportar.disabled=true;
   el.btnExportarSemCusto.disabled=true;
+  if (el.tabComparacaoBtn) el.tabComparacaoBtn.classList.add('hidden');
+  if (el.comparacaoPanel) el.comparacaoPanel.classList.add('hidden');
+  if (el.comparacaoResumo) el.comparacaoResumo.innerHTML='';
+  if (el.tabelaComparacaoHead) el.tabelaComparacaoHead.innerHTML='';
+  if (el.tabelaComparacaoBody) el.tabelaComparacaoBody.innerHTML='';
   el.sumario.classList.add('hidden');
   el.filtros.classList.add('hidden');
   el.composicaoTemporal.classList.add('hidden');
@@ -1179,6 +2037,7 @@ function clearAll(){
   setDefaultReferenceDate();
   setComputerDateDisplay();
   setStatus('');
+  setCompareStatus('');
 }
 function matchAcq(code, broker, product='', issuer=''){
   const brokerKey = `${code}||${normalizeBroker(broker)}`;
@@ -1275,21 +2134,57 @@ el.btnProcessar.addEventListener('click', async ()=>{
         const acqMatch = matchAcq(row['Código'], row['Instituição'], row['Produto'], row['Emissor']);
         const acq = acqMatch.record;
         const acquisitionDate = acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null;
-        const acquisitionCost = acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : 0;
+        const acquisitionCost = acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : NaN;
         const taxProfile = getTaxProfile({ 'Produto painel': row['Produto'], 'Código': row['Código'] });
         const secRate = estimateSecondaryRate(row, acq, dfCdi, dfIpca);
         const v12Mat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, true);
         const v12NoMat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, false);
-        const currentLiquidInfo = estimateNetValue(row['Valor Atualizado CURVA'], acquisitionCost, acquisitionDate, requestedRef, taxProfile);
+        const proxyTaxBase = (!Number.isFinite(acquisitionCost) && !acquisitionDate)
+          ? estimateProxyTaxBase(row, panelRate, dfCdi, dfIpca, { requested: requestedRef, cdi: cdiRefDate, ipca: ipcaRefDate }, requestedRef)
+          : null;
+        const currentLiquidInfo = estimateNetValue(
+          row['Valor Atualizado CURVA'],
+          acquisitionCost,
+          acquisitionDate,
+          requestedRef,
+          taxProfile,
+          {
+            proxyCostValue: proxyTaxBase ? proxyTaxBase.proxyCostValue : NaN,
+            proxyAcquisitionDate: proxyTaxBase ? proxyTaxBase.proxyDate : null,
+            disableIOF: !acquisitionDate
+          }
+        );
         const projectionWithEndDate = (() => {
           let endDate = addMonthsDateOnly(requestedRef, 12);
           if (row['Vencimento'] && compareDateOnly(row['Vencimento'], endDate) < 0) endDate = row['Vencimento'];
           return endDate;
         })();
         const projectionNoEndDate = addMonthsDateOnly(requestedRef, 12);
-        const projectedWithLiquidInfo = estimateNetValue(v12Mat, acquisitionCost, acquisitionDate, projectionWithEndDate, taxProfile);
-        const projectedNoLiquidInfo = estimateNetValue(v12NoMat, acquisitionCost, acquisitionDate, projectionNoEndDate, taxProfile);
-        const quantidadeBase = Number.isFinite(row['Quantidade Disponível']) ? row['Quantidade Disponível'] : row['Quantidade'];
+        const projectedWithLiquidInfo = estimateNetValue(
+          v12Mat,
+          acquisitionCost,
+          acquisitionDate,
+          projectionWithEndDate,
+          taxProfile,
+          {
+            proxyCostValue: proxyTaxBase ? proxyTaxBase.proxyCostValue : NaN,
+            proxyAcquisitionDate: proxyTaxBase ? proxyTaxBase.proxyDate : null,
+            disableIOF: !acquisitionDate
+          }
+        );
+        const projectedNoLiquidInfo = estimateNetValue(
+          v12NoMat,
+          acquisitionCost,
+          acquisitionDate,
+          projectionNoEndDate,
+          taxProfile,
+          {
+            proxyCostValue: proxyTaxBase ? proxyTaxBase.proxyCostValue : NaN,
+            proxyAcquisitionDate: proxyTaxBase ? proxyTaxBase.proxyDate : null,
+            disableIOF: !acquisitionDate
+          }
+        );
+        const quantidadeBase = row['_quantidadeBase'];
         return {
           'Produto painel': row['Produto'],
           'Corretora painel': row['Instituição'],
@@ -1302,7 +2197,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
           'Valor Atualizado CURVA': row['Valor Atualizado CURVA'],
           'Valor Atualizado CURVA líquido': currentLiquidInfo.net,
           'Data aquisição': acquisitionDate,
-          'Custo aquisição': acquisitionCost,
+          'Custo aquisição': Number.isFinite(acquisitionCost) ? acquisitionCost : NaN,
           'PU aquisição': acq && Number.isFinite(acq.pu_aquisicao_medio_aberto) ? acq.pu_aquisicao_medio_aberto : NaN,
           'Taxa compra secundário': secRate.label,
           'Valor projetado 12m com vencimento': v12Mat,
@@ -1315,7 +2210,11 @@ el.btnProcessar.addEventListener('click', async ()=>{
           '_costMatchMode': acqMatch.mode,
           '_taxType': taxProfile.type,
           '_taxHasAcquisitionDate': !!acquisitionDate,
-          '_taxConservativeIr': taxProfile.hasIR && !acquisitionDate,
+          '_taxProxyUsed': !!proxyTaxBase,
+          '_taxProxyDate': proxyTaxBase ? proxyTaxBase.proxyDate : null,
+          '_taxProxyCost': proxyTaxBase ? proxyTaxBase.proxyCostValue : NaN,
+          '_taxProxyPU': proxyTaxBase ? proxyTaxBase.proxyPU : NaN,
+          '_taxConservativeIr': taxProfile.hasIR && !acquisitionDate && !proxyTaxBase,
           '_taxCurrent': currentLiquidInfo.totalTax,
           '_taxProjectedWith': projectedWithLiquidInfo.totalTax,
           '_taxProjectedNo': projectedNoLiquidInfo.totalTax
@@ -1357,6 +2256,38 @@ el.btnProcessar.addEventListener('click', async ()=>{
     setStatus(`Erro: ${err.message || err}`);
   } finally {
     el.btnProcessar.disabled = false;
+  }
+});
+
+el.btnComparar.addEventListener('click', async ()=>{
+  try{
+    if (!el.arquivoComp1.files[0] || !el.arquivoComp2.files[0]) throw new Error('Selecione as duas planilhas para comparação.');
+    el.btnComparar.disabled = true;
+    setCompareStatus('Lendo as duas planilhas e calculando o rendimento comparável...');
+    if (!el.dataComp1.value) fillComparisonDateFromFile(el.arquivoComp1, el.dataComp1);
+    if (!el.dataComp2.value) fillComparisonDateFromFile(el.arquivoComp2, el.dataComp2);
+    const dataInicial = dateOnlyFromString(el.dataComp1.value);
+    const dataFinal = dateOnlyFromString(el.dataComp2.value);
+    if (!dataInicial || !dataFinal) throw new Error('Informe as datas inicial e final da comparação.');
+    const [{ rows: compRows1, actualSheet: sheet1 }, { rows: compRows2, actualSheet: sheet2 }] = await Promise.all([
+      readExcel(el.arquivoComp1.files[0], el.nomeAba.value.trim() || 'Renda Fixa'),
+      readExcel(el.arquivoComp2.files[0], el.nomeAba.value.trim() || 'Renda Fixa')
+    ]);
+    const mapInicial = aggregateForComparison(preparePosicao(compRows1));
+    const mapFinal = aggregateForComparison(preparePosicao(compRows2));
+    const rows = computeComparisonRows(mapInicial, mapFinal, dataInicial, dataFinal);
+    renderComparisonPanel(rows, { dataInicial, dataFinal, sheet1, sheet2, file1: el.arquivoComp1.files[0].name, file2: el.arquivoComp2.files[0].name });
+    setCompareStatus(`Comparação concluída.
+Arquivo inicial: ${el.arquivoComp1.files[0].name} (aba: ${sheet1})
+Arquivo final: ${el.arquivoComp2.files[0].name} (aba: ${sheet2})
+Janela: ${formatDate(dataInicial)} → ${formatDate(dataFinal)}
+Códigos comparados: ${rows.length}`);
+    setActiveTab('comparacao');
+  } catch(err){
+    console.error(err);
+    setCompareStatus(`Erro: ${err.message || err}`);
+  } finally {
+    el.btnComparar.disabled = false;
   }
 });
 
