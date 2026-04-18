@@ -2104,6 +2104,9 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const dfCompras = prepareCompras(comprasRows);
     const comprasMaps = buildComprasMaps(dfCompras);
 
+    const positionDateHint = inferDateFromFilename(el.arquivoPosicao.files[0]?.name || '');
+    const historicalRefWanted = positionDateHint ? minDateOnly(requestedRef, positionDateHint) : requestedRef;
+
     const cdiRefDate = chooseLastAvailableDate(dfCdi, historicalRefWanted);
     const ipcaRefDate = dfIpca.length ? chooseLastAvailableDate(dfIpca, historicalRefWanted) : historicalRefWanted;
     if (!cdiRefDate) throw new Error('Não foi possível definir a data histórica da série CDI para a referência escolhida.');
