@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Painel de Renda Fixa - Corretora, Curva e Secundário</title>
+  <title>Painel de Renda Fixa - Corretora, Curva e Secundário (taxas corrigidas)</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root{
@@ -493,6 +493,15 @@ function todayDateOnly(){
   const now = new Date();
   return { y:now.getFullYear(), m:now.getMonth()+1, d:now.getDate() };
 }
+
+function inferDateFromFilename(filename){
+  const s = String(filename || '');
+  let m = s.match(/(20\d{2})-(\d{2})-(\d{2})/);
+  if (m) return { y:+m[1], m:+m[2], d:+m[3] };
+  m = s.match(/(20\d{2})(\d{2})(\d{2})/);
+  if (m) return { y:+m[1], m:+m[2], d:+m[3] };
+  return null;
+}
 function minDateOnly(a,b){
   if (!a) return b || null;
   if (!b) return a || null;
@@ -742,6 +751,7 @@ function preparePosicao(rows){
   }).filter(r => r['Código'] && Number.isFinite(r['_quantidadeBase']) && r['_quantidadeBase'] > 0);
 }
 
+
 function cdiSeriesBetween(dfCdi, startDate, endDate){
   return dfCdi.filter(r => compareDateOnly(r.data, startDate) > 0 && compareDateOnly(r.data, endDate) <= 0);
 }
@@ -751,36 +761,22 @@ function diFactorBetween(dfCdi, startDate, endDate, factor){
   for (const r of arr) acc *= (1 + factor * r.taxa_diaria_decimal);
   return acc;
 }
-function ipcaMonthlyFactorBetween(dfIpca, startDate, endDate){
-  if (!dfIpca.length) return NaN;
-  const startKey = startDate.y*100 + startDate.m;
-  const endKey = endDate.y*100 + endDate.m;
+function diFactorBetweenExtended(dfCdi, startDate, endDate, factor){
+  if (!startDate || !endDate || compareDateOnly(endDate, startDate) <= 0) return 1;
+  const arr = cdiSeriesBetween(dfCdi, startDate, endDate);
   let acc = 1;
-  let used = 0;
-  for (const r of dfIpca){
-    const key = r.data.y*100 + r.data.m;
-    if (key > startKey && key <= endKey){
-      acc *= (1 + r.ipca_mensal_percentual/100);
-      used += 1;
+  for (const r of arr) acc *= (1 + factor * r.taxa_diaria_decimal);
+  if (!dfCdi.length) return acc;
+  const lastAvailable = chooseLastAvailableDate(dfCdi, endDate);
+  if (!lastAvailable) return acc;
+  if (compareDateOnly(endDate, lastAvailable) > 0){
+    const lastRow = [...dfCdi].reverse().find(r => dateOnlyToKey(r.data) === dateOnlyToKey(lastAvailable));
+    if (lastRow && Number.isFinite(lastRow.taxa_diaria_decimal)){
+      const extraDu = busdayCount(lastAvailable, endDate);
+      if (extraDu > 0) acc *= Math.pow(1 + factor * lastRow.taxa_diaria_decimal, extraDu);
     }
   }
-  return used ? acc : 1;
-}
-function solveBisection(fn, lo, hi){
-  let flo = fn(lo), fhi = fn(hi);
-  let count = 0;
-  while ((!Number.isFinite(flo) || !Number.isFinite(fhi) || flo * fhi > 0) && hi < 50 && count < 20){
-    hi *= 2; fhi = fn(hi); count += 1;
-  }
-  if (!Number.isFinite(flo) || !Number.isFinite(fhi) || flo * fhi > 0) return NaN;
-  for (let i=0;i<120;i++){
-    const mid = (lo+hi)/2;
-    const fmid = fn(mid);
-    if (!Number.isFinite(fmid)) return NaN;
-    if (Math.abs(fmid) < 1e-10 || Math.abs(hi-lo) < 1e-10) return mid;
-    if (flo * fmid <= 0){ hi = mid; } else { lo = mid; flo = fmid; }
-  }
-  return (lo+hi)/2;
+  return acc;
 }
 function estimatePanelRate(row, dfCdi, dfIpca, refDates){
   const price = row['Preço Atualizado CURVA'];
@@ -791,7 +787,7 @@ function estimatePanelRate(row, dfCdi, dfIpca, refDates){
   if (row['Indexador'] === 'DI'){
     const refDate = refDates.cdi;
     if (!refDate || compareDateOnly(refDate, issue) <= 0) return { label:'-', raw:NaN, effectiveRefDate:refDate };
-    const f = solveBisection(x => face * diFactorBetween(dfCdi, issue, refDate, x) - price, 0, 3);
+    const f = solveBisection(x => face * diFactorBetweenExtended(dfCdi, issue, refDate, x) - price, 0, 3);
     return { label: Number.isFinite(f) ? `${brPct(f*100,2)} CDI` : '-', raw:f, effectiveRefDate:refDate };
   }
   if (row['Indexador'] === 'PREFIXADO'){
@@ -823,7 +819,7 @@ function estimateSecondaryRate(row, acq, dfCdi, dfIpca){
   if (!issue || compareDateOnly(acqDate, issue) <= 0) return { label:'-', raw:NaN };
   const face = chooseFaceValue(row['Preço Atualizado CURVA']);
   if (row['Indexador'] === 'DI'){
-    const f = solveBisection(x => face * diFactorBetween(dfCdi, issue, acqDate, x) - pu, 0, 3);
+    const f = solveBisection(x => face * diFactorBetweenExtended(dfCdi, issue, acqDate, x) - pu, 0, 3);
     return { label: Number.isFinite(f) ? `${brPct(f*100,2)} CDI` : '-', raw:f };
   }
   if (row['Indexador'] === 'PREFIXADO'){
@@ -1549,7 +1545,7 @@ function estimatePanelRate(row, dfCdi, dfIpca, refDates){
   if (row['Indexador'] === 'DI'){
     const refDate = refDates.cdi;
     if (!refDate || compareDateOnly(refDate, issue) <= 0) return { label:'-', raw:NaN, effectiveRefDate:refDate };
-    const f = solveBisection(x => face * diFactorBetween(dfCdi, issue, refDate, x) - price, 0, 3);
+    const f = solveBisection(x => face * diFactorBetweenExtended(dfCdi, issue, refDate, x) - price, 0, 3);
     return { label: Number.isFinite(f) ? `${brPct(f*100,2)} CDI` : '-', raw:f, effectiveRefDate:refDate };
   }
   if (row['Indexador'] === 'PREFIXADO'){
@@ -1581,7 +1577,7 @@ function estimateSecondaryRate(row, acq, dfCdi, dfIpca){
   if (!issue || compareDateOnly(acqDate, issue) <= 0) return { label:'-', raw:NaN };
   const face = chooseFaceValue(row['Preço Atualizado CURVA']);
   if (row['Indexador'] === 'DI'){
-    const f = solveBisection(x => face * diFactorBetween(dfCdi, issue, acqDate, x) - pu, 0, 3);
+    const f = solveBisection(x => face * diFactorBetweenExtended(dfCdi, issue, acqDate, x) - pu, 0, 3);
     return { label: Number.isFinite(f) ? `${brPct(f*100,2)} CDI` : '-', raw:f };
   }
   if (row['Indexador'] === 'PREFIXADO'){
@@ -2108,8 +2104,8 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const dfCompras = prepareCompras(comprasRows);
     const comprasMaps = buildComprasMaps(dfCompras);
 
-    const cdiRefDate = chooseLastAvailableDate(dfCdi, requestedRef);
-    const ipcaRefDate = dfIpca.length ? chooseLastAvailableDate(dfIpca, requestedRef) : requestedRef;
+    const cdiRefDate = chooseLastAvailableDate(dfCdi, historicalRefWanted);
+    const ipcaRefDate = dfIpca.length ? chooseLastAvailableDate(dfIpca, historicalRefWanted) : historicalRefWanted;
     if (!cdiRefDate) throw new Error('Não foi possível definir a data histórica da série CDI para a referência escolhida.');
 
     state.dfPosicaoRaw = dfPos;
@@ -2121,6 +2117,8 @@ el.btnProcessar.addEventListener('click', async ()=>{
     state.comprasMap = comprasMaps.byCodeBroker;
     state.comprasByCode = comprasMaps.byCode;
     state.refDateRequested = requestedRef;
+    state.historicalRefWanted = historicalRefWanted;
+    state.positionDateHint = positionDateHint;
     state.cdiRefDate = cdiRefDate;
     state.ipcaRefDate = ipcaRefDate;
 
@@ -2240,9 +2238,12 @@ el.btnProcessar.addEventListener('click', async ()=>{
     setStatus(
       `Processamento concluído.\n` +
       `Aba usada: ${actualSheet}\n` +
-      `Data de referência solicitada: ${formatDate(requestedRef)}\n` +
+      `Data do computador usada no painel: ${formatDate(requestedRef)}\n` +
+      `Data da planilha inferida pelo nome: ${positionDateHint ? formatDate(positionDateHint) : '-'}\n` +
+      `Data-base histórica da marcação: ${formatDate(historicalRefWanted)}\n` +
       `Data histórica CDI usada: ${formatDate(cdiRefDate)}\n` +
       `Data histórica IPCA usada: ${formatDate(ipcaRefDate)}\n` +
+      `CDI projetado com última taxa disponível até a data-base: ${compareDateOnly(historicalRefWanted, cdiRefDate) > 0 ? 'sim' : 'não'}\n` +
       `Hora local do processamento: ${new Date().toLocaleString('pt-BR')}\n` +
       `Linhas exibidas no painel: ${result.length}
 ` +
