@@ -499,7 +499,9 @@ function minDateOnly(a,b){
   return compareDateOnly(a,b) <= 0 ? a : b;
 }
 function setComputerDateDisplay(){
-  if (el.todayDisplay) el.todayDisplay.value = `${formatDate(todayDateOnly())} ${new Date().toLocaleTimeString('pt-BR')}`;
+  const now = new Date();
+  const today = { y:now.getFullYear(), m:now.getMonth()+1, d:now.getDate() };
+  if (el.todayDisplay) el.todayDisplay.value = `${formatDate(today)} ${now.toLocaleTimeString('pt-BR')}`;
 }
 function inferDateFromFilename(name){
   const s = String(name || '');
@@ -515,12 +517,17 @@ function fillComparisonDateFromFile(inputEl, dateEl){
   if (inferred) dateEl.value = dateOnlyToKey(inferred);
 }
 
-function setDefaultReferenceDate(){
+function syncReferenceDateFromComputer(){
   const today = todayDateOnly();
-  el.dataReferencia.value = dateOnlyToKey(today);
+  if (el.dataReferencia) el.dataReferencia.value = dateOnlyToKey(today);
+  setComputerDateDisplay();
+  return today;
+}
+function setDefaultReferenceDate(){
+  return syncReferenceDateFromComputer();
 }
 function getRequestedReferenceDate(){
-  return dateOnlyFromString(el.dataReferencia.value) || todayDateOnly();
+  return syncReferenceDateFromComputer();
 }
 function busdayCount(startObj,endObj){
   if (!startObj || !endObj || compareDateOnly(endObj,startObj) <= 0) return 0;
@@ -1282,11 +1289,10 @@ function renderComparisonCell(col, val, row){
   return `<td>${escapeHtml(val ?? '-')}</td>`;
 }
 function setDefaultReferenceDate(){
-  const today = todayDateOnly();
-  el.dataReferencia.value = dateOnlyToKey(today);
+  return syncReferenceDateFromComputer();
 }
 function getRequestedReferenceDate(){
-  return dateOnlyFromString(el.dataReferencia.value) || todayDateOnly();
+  return syncReferenceDateFromComputer();
 }
 function busdayCount(startObj,endObj){
   if (!startObj || !endObj || compareDateOnly(endObj,startObj) <= 0) return 0;
@@ -1620,7 +1626,7 @@ function project12m(row, panelRate, refDate, cdiFuturePct, ipcaFuturePct, consid
   return projectionBase;
 }
 
-const IOF_REGRESSIVE_TABLE = {
+const IOF_REGRESSIVE_TABLE_DUP = {
   1:0.96, 2:0.93, 3:0.90, 4:0.86, 5:0.83, 6:0.80, 7:0.76, 8:0.73, 9:0.70,
   10:0.66, 11:0.63, 12:0.60, 13:0.56, 14:0.53, 15:0.50, 16:0.46, 17:0.43, 18:0.40,
   19:0.36, 20:0.33, 21:0.30, 22:0.26, 23:0.23, 24:0.20, 25:0.16, 26:0.13, 27:0.10,
@@ -2066,8 +2072,8 @@ function matchAcq(code, broker, product='', issuer=''){
 
 setDefaultReferenceDate();
 setComputerDateDisplay();
-window.addEventListener('focus', setComputerDateDisplay);
-document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) setComputerDateDisplay(); });
+window.addEventListener('focus', syncReferenceDateFromComputer);
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) syncReferenceDateFromComputer(); });
 
 if (el.tabButtons) {
   el.tabButtons.forEach(btn => btn.addEventListener('click', ()=> setActiveTab(btn.dataset.tabTarget)));
@@ -2084,9 +2090,8 @@ el.btnProcessar.addEventListener('click', async ()=>{
   try{
     if (!el.arquivoPosicao.files[0]) throw new Error('Selecione a planilha de posição.');
     el.btnProcessar.disabled = true;
-    setComputerDateDisplay();
     const requestedRef = getRequestedReferenceDate();
-    setStatus('Lendo planilha, séries e custos de aquisição...');
+    setStatus('Lendo planilha, séries e custos de aquisição...\nData do computador sincronizada no processamento.');
     const comprasInfoPromise = fetchFirstCsv([
       './compras_secundario.csv'
     ]);
