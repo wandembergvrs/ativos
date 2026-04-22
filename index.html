@@ -126,6 +126,12 @@
         <label for="arquivoPosicao">Planilha de posição (.xlsx)</label>
         <input id="arquivoPosicao" type="file" accept=".xlsx" />
       </div>
+
+      <div class="field">
+        <label for="arquivoCompras">CSV de compras secundárias (opcional, recomendado)</label>
+        <input id="arquivoCompras" type="file" accept=".csv,text/csv" />
+        <div class="helper-note">Quando enviado aqui, o painel usa exatamente este CSV e ignora o arquivo buscado automaticamente no diretório. Isso evita cache e ambiguidade de versão.</div>
+      </div>
       <div class="field">
         <label for="nomeAba">Nome da aba</label>
         <input id="nomeAba" type="text" value="Renda Fixa" />
@@ -378,6 +384,7 @@ const COMPARISON_COLUMNS = [
 
 const el = {
   arquivoPosicao: document.getElementById('arquivoPosicao'),
+  arquivoCompras: document.getElementById('arquivoCompras'),
   nomeAba: document.getElementById('nomeAba'),
   cdiFuturo: document.getElementById('cdiFuturo'),
   ipcaFuturo: document.getElementById('ipcaFuturo'),
@@ -2113,9 +2120,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     el.btnProcessar.disabled = true;
     const requestedRef = getRequestedReferenceDate();
     setStatus('Lendo planilha, séries e custos de aquisição...\nData do computador sincronizada no processamento.');
-    const comprasInfoPromise = fetchFirstCsv([
-      './compras_secundario.csv'
-    ]);
+    const comprasInfoPromise = loadComprasSource();
     const [{rows: posRows, actualSheet}, cdiRows, ipcaRows, comprasInfo] = await Promise.all([
       readExcel(el.arquivoPosicao.files[0], el.nomeAba.value.trim() || 'Renda Fixa'),
       fetchCsv('./serie_cdi.csv'),
@@ -2139,6 +2144,8 @@ el.btnProcessar.addEventListener('click', async ()=>{
     state.dfPosicaoRaw = dfPos;
     state.dfComprasRaw = dfCompras;
     state.comprasCsvPath = comprasInfo.path;
+    state.comprasSourceType = comprasInfo.sourceType || 'fetch';
+    state.comprasSourceName = comprasInfo.fileName || comprasInfo.path || '';
     state.dfCdi = dfCdi;
     state.dfIpca = dfIpca;
     state.dfCompras = dfCompras;
@@ -2270,7 +2277,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const cdb325 = result.find(r => r['Código'] === 'CDB325C2TBT');
     setStatus(
       `Processamento concluído.\n` +
-      `Versão do painel: v11-auditoria-funcional\n` +
+      `Versão do painel: v12-revisao-funcional-uploadcsv\n` +
       `Aba usada: ${actualSheet}\n` +
       `Data do computador usada no painel: ${formatDate(requestedRef)}\n` +
       `Data da planilha inferida pelo nome: ${positionDateHint ? formatDate(positionDateHint) : '-'}\n` +
@@ -2279,9 +2286,12 @@ el.btnProcessar.addEventListener('click', async ()=>{
       `Data histórica IPCA usada: ${formatDate(ipcaRefDate)}\n` +
       `CDI projetado com última taxa disponível até a data-base: ${compareDateOnly(historicalRefWanted, cdiRefDate) > 0 ? 'sim' : 'não'}\n` +
       `Hora local do processamento: ${new Date().toLocaleString('pt-BR')}\n` +
+      `Fonte do CSV de compras: ${state.comprasSourceType === 'upload' ? 'upload manual' : 'busca automática'}\n` +
+      `Arquivo de compras usado: ${state.comprasSourceName || state.comprasCsvPath || '-'}\n` +
+      `Linhas carregadas do CSV de compras: ${dfCompras.length}\n` +
       `Linhas exibidas no painel: ${result.length}
 ` +
-      `Compras com match exato por código + corretora: ${result.filter(r => r['_costMatchMode'] === 'codigo_corretora').length}
+      `Compras com match exato por código + corretora: ${result.filter(r => String(r['_costMatchMode'] || '').includes('codigo_corretora_exato')).length}
 ` +
       `Compras com fallback por código: ${result.filter(r => r['_costMatchMode'] !== 'codigo_corretora' && Number.isFinite(r['Custo aquisição']) && r['Custo aquisição'] > 0).length}
 ` +
@@ -2290,7 +2300,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
       `Linhas com código duplicado: ${result.filter(r => r['_codigoDuplicado']).length}
 ` +
       `Linhas com IR na maior faixa por falta de data de aquisição: ${result.filter(r => r['_taxConservativeIr']).length}` +
-      (cdb325 ? `\nCDB325C2TBT => modo: ${cdb325['_costMatchMode'] || '-'} | custo: R$ ${brNumber(cdb325['Custo aquisição'])} | detalhe: ${cdb325['_costMatchDetail'] || '-'}` : '')
+      (cdb325 ? `\nCDB325C2TBT => candidatos no CSV carregado: ${cdb325['_costMatchCandidateCount'] || 0} | modo: ${cdb325['_costMatchMode'] || '-'} | custo: R$ ${brNumber(cdb325['Custo aquisição'])} | detalhe: ${cdb325['_costMatchDetail'] || '-'}` : '')
     );
   } catch(err){
     console.error(err);
@@ -2679,6 +2689,32 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
     return parseCSV(await resp.text());
   };
 
+
+  async function readTextFile(file){
+    if (!file) throw new Error('Arquivo não informado.');
+    return await file.text();
+  }
+
+  async function loadComprasSource(){
+    const uploaded = el.arquivoCompras && el.arquivoCompras.files && el.arquivoCompras.files[0] ? el.arquivoCompras.files[0] : null;
+    if (uploaded){
+      const text = await readTextFile(uploaded);
+      return {
+        rows: parseCSV(text),
+        path: `(upload) ${uploaded.name}`,
+        sourceType: 'upload',
+        fileName: uploaded.name
+      };
+    }
+    const info = await fetchFirstCsv(['./compras_secundario.csv']);
+    return {
+      rows: info.rows,
+      path: info.path,
+      sourceType: 'fetch',
+      fileName: info.path
+    };
+  }
+
   prepareCompras = function(rows){
     return rows.map(r => ({
       codigo: String(r.codigo ?? '').trim(),
@@ -2763,7 +2799,7 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
   window.__painelHealthcheck = function(){
     const required = ['makeRecordKey','recordSummaryText','matchAcqRobust','estimateSecondaryRateV8','buildDiagnosticsRows','renderDiagnostics'];
     const missing = required.filter(name => typeof window[name] !== 'function');
-    return { version: 'v11-auditoria-funcional', missing };
+    return { version: 'v12-revisao-funcional-uploadcsv', missing };
   };
 
   document.addEventListener('DOMContentLoaded', function(){
@@ -2778,7 +2814,7 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
         'O custo de aquisição prioriza <strong>código + corretora</strong>, mas também agrega lotes do mesmo código quando a quantidade da posição exigir'
       );
     }
-    const health = window.__painelHealthcheck ? window.__painelHealthcheck() : { version:'v11-auditoria-funcional', missing:['__painelHealthcheck'] };
+    const health = window.__painelHealthcheck ? window.__painelHealthcheck() : { version:'v12-revisao-funcional-uploadcsv', missing:['__painelHealthcheck'] };
     if (health.missing.length){
       console.error('Healthcheck do painel encontrou funções ausentes:', health.missing);
     }
