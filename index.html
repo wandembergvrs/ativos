@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Painel de Renda Fixa - Corretora, Curva e Secundário (taxas corrigidas)</title>
+  <title>Painel de Renda Fixa - Corretora, Curva e Secundário (v10)</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root{
@@ -101,7 +101,7 @@
 <body>
 <div class="container">
   <section class="hero">
-    <h1>Painel de Renda Fixa com Corretora e Custo de Aquisição <span style="font-size:18px;color:#a8b3d1;">v7</span></h1>
+    <h1>Painel de Renda Fixa com Corretora e Custo de Aquisição <span style="font-size:18px;color:#a8b3d1;">v10</span></h1>
     <p>
       Envie a planilha de posição. O site usa automaticamente <code>serie_cdi.csv</code>,
       <code>serie_ipca.csv</code> e o arquivo <code>compras_secundario.csv</code> do repositório.
@@ -115,7 +115,7 @@
       <span class="pill">Bruto x líquido</span>
       <span class="pill">CSV de ativos sem custo</span>
       <span class="pill">Versão v8 diagnóstico</span>
-      <span class="pill">Match v7: agrega lotes por código antes do match por corretora quando a quantidade fecha</span>
+      <span class="pill">Match v10: agrega lotes por código antes do match por corretora quando a quantidade fecha</span>
     </div>
   </section>
 
@@ -2270,7 +2270,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const cdb325 = result.find(r => r['Código'] === 'CDB325C2TBT');
     setStatus(
       `Processamento concluído.\n` +
-      `Versão do painel: v9-diagnostico-fixscope\n` +
+      `Versão do painel: v10-diagnostico-fixscope\n` +
       `Aba usada: ${actualSheet}\n` +
       `Data do computador usada no painel: ${formatDate(requestedRef)}\n` +
       `Data da planilha inferida pelo nome: ${positionDateHint ? formatDate(positionDateHint) : '-'}\n` +
@@ -2753,6 +2753,7 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
     return _oldEstimateSecondaryRate(row, acq, dfCdi, dfIpca);
   };
 
+  window.makeRecordKey = makeRecordKey;
   window.matchAcqRobust = matchAcqRobust;
   window.estimateSecondaryRateV8 = estimateSecondaryRateV8;
   window.buildDiagnosticsRows = buildDiagnosticsRows;
