@@ -2277,7 +2277,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const cdb325 = result.find(r => r['Código'] === 'CDB325C2TBT');
     setStatus(
       `Processamento concluído.\n` +
-      `Versão do painel: v12-revisao-funcional-uploadcsv\n` +
+      `Versão do painel: v13-revisao-escopo-global\n` +
       `Aba usada: ${actualSheet}\n` +
       `Data do computador usada no painel: ${formatDate(requestedRef)}\n` +
       `Data da planilha inferida pelo nome: ${positionDateHint ? formatDate(positionDateHint) : '-'}\n` +
@@ -2795,11 +2795,12 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
   window.estimateSecondaryRateV8 = estimateSecondaryRateV8;
   window.buildDiagnosticsRows = buildDiagnosticsRows;
   window.renderDiagnostics = renderDiagnostics;
+  window.loadComprasSource = loadComprasSource;
 
   window.__painelHealthcheck = function(){
-    const required = ['makeRecordKey','recordSummaryText','matchAcqRobust','estimateSecondaryRateV8','buildDiagnosticsRows','renderDiagnostics'];
+    const required = ['makeRecordKey','recordSummaryText','matchAcqRobust','estimateSecondaryRateV8','buildDiagnosticsRows','renderDiagnostics','loadComprasSource'];
     const missing = required.filter(name => typeof window[name] !== 'function');
-    return { version: 'v12-revisao-funcional-uploadcsv', missing };
+    return { version: 'v13-revisao-escopo-global', missing };
   };
 
   document.addEventListener('DOMContentLoaded', function(){
@@ -2814,7 +2815,7 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
         'O custo de aquisição prioriza <strong>código + corretora</strong>, mas também agrega lotes do mesmo código quando a quantidade da posição exigir'
       );
     }
-    const health = window.__painelHealthcheck ? window.__painelHealthcheck() : { version:'v12-revisao-funcional-uploadcsv', missing:['__painelHealthcheck'] };
+    const health = window.__painelHealthcheck ? window.__painelHealthcheck() : { version:'v13-revisao-escopo-global', missing:['__painelHealthcheck'] };
     if (health.missing.length){
       console.error('Healthcheck do painel encontrou funções ausentes:', health.missing);
     }
