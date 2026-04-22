@@ -1504,6 +1504,13 @@ function preparePosicao(rows){
     row['Data de Emissão'] = dateOnlyFromExcel(row['Data de Emissão']);
     row['Vencimento'] = dateOnlyFromExcel(row['Vencimento']);
     ['Quantidade','Quantidade Disponível','Preço Atualizado CURVA','Valor Atualizado CURVA'].forEach(c => row[c] = toNumber(row[c]));
+
+    const qtdDisponivel = toNumber(row['Quantidade Disponível']);
+    const qtdTotal = toNumber(row['Quantidade']);
+    row['_quantidadeBase'] = (Number.isFinite(qtdDisponivel) && qtdDisponivel > 0)
+      ? qtdDisponivel
+      : ((Number.isFinite(qtdTotal) && qtdTotal > 0) ? qtdTotal : NaN);
+
     row['_valorAtualizadoCurvaOriginal'] = row['Valor Atualizado CURVA'];
     row['_valorAtualizadoFechamento'] = getNumericFromCandidates(row, [
       'Valor Atualizado FECHAMENTO','Valor Atualizado Fechamento','Valor Atualizado fechamento',
@@ -1520,7 +1527,7 @@ function preparePosicao(rows){
       row['Preço Atualizado CURVA'] = chosenCurrent.price;
     }
     return row;
-  }).filter(r => r['Código']);
+  }).filter(r => r['Código'] && Number.isFinite(r['_quantidadeBase']) && r['_quantidadeBase'] > 0);
 }
 
 function cdiSeriesBetween(dfCdi, startDate, endDate){
@@ -2277,7 +2284,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const cdb325 = result.find(r => r['Código'] === 'CDB325C2TBT');
     setStatus(
       `Processamento concluído.\n` +
-      `Versão do painel: v13-revisao-escopo-global\n` +
+      `Versão do painel: v14-fix-quantidadebase\n` +
       `Aba usada: ${actualSheet}\n` +
       `Data do computador usada no painel: ${formatDate(requestedRef)}\n` +
       `Data da planilha inferida pelo nome: ${positionDateHint ? formatDate(positionDateHint) : '-'}\n` +
@@ -2300,7 +2307,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
       `Linhas com código duplicado: ${result.filter(r => r['_codigoDuplicado']).length}
 ` +
       `Linhas com IR na maior faixa por falta de data de aquisição: ${result.filter(r => r['_taxConservativeIr']).length}` +
-      (cdb325 ? `\nCDB325C2TBT => candidatos no CSV carregado: ${cdb325['_costMatchCandidateCount'] || 0} | modo: ${cdb325['_costMatchMode'] || '-'} | custo: R$ ${brNumber(cdb325['Custo aquisição'])} | detalhe: ${cdb325['_costMatchDetail'] || '-'}` : '')
+      (cdb325 ? `\nCDB325C2TBT => qtd painel: ${Number.isFinite(cdb325['_quantidadeBase']) ? brNumber(cdb325['_quantidadeBase'],2) : '-'} | candidatos no CSV carregado: ${cdb325['_costMatchCandidateCount'] || 0} | modo: ${cdb325['_costMatchMode'] || '-'} | custo: R$ ${brNumber(cdb325['Custo aquisição'])} | detalhe: ${cdb325['_costMatchDetail'] || '-'}` : '')
     );
   } catch(err){
     console.error(err);
@@ -2800,7 +2807,8 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
   window.__painelHealthcheck = function(){
     const required = ['makeRecordKey','recordSummaryText','matchAcqRobust','estimateSecondaryRateV8','buildDiagnosticsRows','renderDiagnostics','loadComprasSource'];
     const missing = required.filter(name => typeof window[name] !== 'function');
-    return { version: 'v13-revisao-escopo-global', missing };
+    const quantityProbe = typeof preparePosicao === 'function';
+    return { version: 'v14-fix-quantidadebase', missing, quantityProbe };
   };
 
   document.addEventListener('DOMContentLoaded', function(){
@@ -2815,7 +2823,7 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
         'O custo de aquisição prioriza <strong>código + corretora</strong>, mas também agrega lotes do mesmo código quando a quantidade da posição exigir'
       );
     }
-    const health = window.__painelHealthcheck ? window.__painelHealthcheck() : { version:'v13-revisao-escopo-global', missing:['__painelHealthcheck'] };
+    const health = window.__painelHealthcheck ? window.__painelHealthcheck() : { version:'v14-fix-quantidadebase', missing:['__painelHealthcheck'] };
     if (health.missing.length){
       console.error('Healthcheck do painel encontrou funções ausentes:', health.missing);
     }
