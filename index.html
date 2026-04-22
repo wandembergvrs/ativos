@@ -106,11 +106,11 @@
       Envie a planilha de posição. O site usa automaticamente <code>serie_cdi.csv</code>,
       <code>serie_ipca.csv</code> e o arquivo <code>compras_secundario.csv</code> do repositório.
       Agora a data de referência pode ser definida pelo usuário, iniciando por padrão na data do dia.
-      O custo de aquisição é casado preferencialmente por <strong>código + corretora</strong>, mas agora também agrega lotes do mesmo código quando a <strong>quantidade atual</strong> indicar que houve consolidação entre corretoras. O painel também mostra a composição ponderada de <strong>prefixados x pós-fixados</strong> ao longo do tempo, além de valores <strong>brutos e líquidos</strong> na posição e nas projeções.
+      O custo de aquisição continua sendo casado por <strong>código + corretora</strong>, e o painel também passa a mostrar a composição ponderada de <strong>prefixados x pós-fixados</strong> ao longo do tempo, além de valores <strong>brutos e líquidos</strong> na posição e nas projeções.
     </p>
     <div>
       <span class="pill">Data de referência editável</span>
-      <span class="pill">Match por código com validação por quantidade e valor</span>
+      <span class="pill">Match por código + corretora</span>
       <span class="pill">Composição ponderada ao longo do tempo</span>
       <span class="pill">Bruto x líquido</span>
       <span class="pill">CSV de ativos sem custo</span>
@@ -2041,143 +2041,13 @@ function clearAll(){
   setStatus('');
   setCompareStatus('');
 }
-function approxEqual(a, b, tol = 1e-6){
-  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol;
-}
-function aggregateAcqRecords(records, brokerHint=''){
-  if (!records || !records.length) return null;
-  if (records.length === 1) return records[0];
-  const first = records[0];
-  const qtyTotal = records.reduce((acc, r) => acc + (Number.isFinite(r.quantidade_aberta_historico) ? r.quantidade_aberta_historico : 0), 0);
-  const costTotal = records.reduce((acc, r) => acc + (Number.isFinite(r.custo_aquisicao_total_aberto) ? r.custo_aquisicao_total_aberto : 0), 0);
-  const weightedDateTs = records.reduce((acc, r) => {
-    const w = Number.isFinite(r.quantidade_aberta_historico) && r.quantidade_aberta_historico > 0 ? r.quantidade_aberta_historico : 0;
-    const d = r.data_aquisicao_media || r.data_primeira_aquisicao_aberta || r.data_ultima_aquisicao_aberta;
-    if (!w || !d) return acc;
-    return acc + (new Date(d.y, d.m - 1, d.d).getTime() * w);
-  }, 0);
-  const weightedDate = qtyTotal > 0 && weightedDateTs > 0 ? (() => {
-    const dt = new Date(weightedDateTs / qtyTotal);
-    return { y: dt.getFullYear(), m: dt.getMonth() + 1, d: dt.getDate() };
-  })() : (first.data_aquisicao_media || first.data_primeira_aquisicao_aberta || null);
-
-  return {
-    ...first,
-    corretora_atual: brokerHint || first.corretora_atual,
-    data_primeira_aquisicao_aberta: records
-      .map(r => r.data_primeira_aquisicao_aberta || r.data_aquisicao_media || r.data_ultima_aquisicao_aberta)
-      .filter(Boolean)
-      .sort(compareDateOnly)[0] || null,
-    data_ultima_aquisicao_aberta: records
-      .map(r => r.data_ultima_aquisicao_aberta || r.data_aquisicao_media || r.data_primeira_aquisicao_aberta)
-      .filter(Boolean)
-      .sort(compareDateOnly)
-      .slice(-1)[0] || null,
-    data_aquisicao_media: weightedDate,
-    quantidade_aberta_historico: qtyTotal,
-    custo_aquisicao_total_aberto: costTotal,
-    pu_aquisicao_medio_aberto: qtyTotal > 0 ? costTotal / qtyTotal : NaN,
-    lotes_abertos: records.reduce((acc, r) => acc + (Number.isFinite(r.lotes_abertos) ? r.lotes_abertos : 0), 0),
-    detalhe_lotes_abertos: records.map(r => r.detalhe_lotes_abertos).filter(Boolean).join(' || '),
-    status_posicao_compra: 'agregado_por_codigo'
-  };
-}
-function findQuantityMatchingSubset(records, targetQty){
-  if (!records || !records.length || !Number.isFinite(targetQty) || targetQty <= 0) return null;
-  const n = records.length;
-  if (n > 12) return null;
-  let bestMask = null;
-  let bestCount = Infinity;
-  for (let mask = 1; mask < (1 << n); mask++) {
-    let qty = 0;
-    let count = 0;
-    for (let i = 0; i < n; i++) {
-      if (mask & (1 << i)) {
-        qty += Number.isFinite(records[i].quantidade_aberta_historico) ? records[i].quantidade_aberta_historico : 0;
-        count += 1;
-      }
-    }
-    if (approxEqual(qty, targetQty, 1e-4)) {
-      if (count < bestCount) {
-        bestMask = mask;
-        bestCount = count;
-      }
-    }
-  }
-  if (bestMask === null) return null;
-  return records.filter((_, i) => (bestMask & (1 << i)) !== 0);
-}
-
-function findValueMatchingSubset(records, targetValue){
-  if (!records || !records.length || !Number.isFinite(targetValue) || targetValue <= 0) return null;
-  const n = records.length;
-  if (n > 12) return null;
-  let bestMask = null;
-  let bestCount = Infinity;
-  let bestDiff = Infinity;
-  const toleranceAbs = Math.max(5, targetValue * 0.02);
-  for (let mask = 1; mask < (1 << n); mask++) {
-    let total = 0;
-    let count = 0;
-    for (let i = 0; i < n; i++) {
-      if (mask & (1 << i)) {
-        total += Number.isFinite(records[i].valor_curva_atual) ? records[i].valor_curva_atual : 0;
-        count += 1;
-      }
-    }
-    const diff = Math.abs(total - targetValue);
-    if (diff <= toleranceAbs) {
-      if (count < bestCount || (count === bestCount && diff < bestDiff)) {
-        bestMask = mask;
-        bestCount = count;
-        bestDiff = diff;
-      }
-    }
-  }
-  if (bestMask === null) return null;
-  return records.filter((_, i) => (bestMask & (1 << i)) !== 0);
-}
-function matchAcq(code, broker, quantity, currentValue, product='', issuer=''){
+function matchAcq(code, broker, product='', issuer=''){
   const brokerKey = `${code}||${normalizeBroker(broker)}`;
   const exact = state.comprasMap.get(brokerKey);
+  if (exact) return { record: exact, mode: 'codigo_corretora' };
+
   const candidates = state.comprasByCode.get(code) || [];
   if (!candidates.length) return { record: null, mode: 'sem_match' };
-
-  if (exact && Number.isFinite(quantity) && approxEqual(exact.quantidade_aberta_historico, quantity, 1e-4)) {
-    return { record: exact, mode: 'codigo_corretora' };
-  }
-
-  if (Number.isFinite(quantity)) {
-    const exactSubset = findQuantityMatchingSubset(candidates, quantity);
-    if (exactSubset && exactSubset.length) {
-      if (exactSubset.length === 1) {
-        const only = exactSubset[0];
-        const mode = normalizeBroker(only.corretora_atual) === normalizeBroker(broker) ? 'codigo_corretora' : 'codigo_quantidade';
-        return { record: only, mode };
-      }
-      return {
-        record: aggregateAcqRecords(exactSubset, normalizeBroker(broker)),
-        mode: 'codigo_agregado_quantidade'
-      };
-    }
-  }
-
-  if (Number.isFinite(currentValue)) {
-    const valueSubset = findValueMatchingSubset(candidates, currentValue);
-    if (valueSubset && valueSubset.length) {
-      if (valueSubset.length === 1) {
-        const only = valueSubset[0];
-        const mode = normalizeBroker(only.corretora_atual) === normalizeBroker(broker) ? 'codigo_corretora_valor' : 'codigo_valor';
-        return { record: only, mode };
-      }
-      return {
-        record: aggregateAcqRecords(valueSubset, normalizeBroker(broker)),
-        mode: 'codigo_agregado_valor'
-      };
-    }
-  }
-
-  if (exact) return { record: exact, mode: 'codigo_corretora_parcial' };
   if (candidates.length === 1) return { record: candidates[0], mode: 'codigo' };
 
   const productNorm = normalizeTextLoose(product);
@@ -2267,7 +2137,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
           cdi: cdiRefDate,
           ipca: ipcaRefDate
         });
-        const acqMatch = matchAcq(row['Código'], row['Instituição'], row['_quantidadeBase'], row['Valor Atualizado CURVA'], row['Produto'], row['Emissor']);
+        const acqMatch = matchAcq(row['Código'], row['Instituição'], row['Produto'], row['Emissor'], row['_quantidadeBase'], row['Valor Atualizado CURVA']);
         const acq = acqMatch.record;
         const acquisitionDate = acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null;
         const acquisitionCost = acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : NaN;
@@ -2438,5 +2308,278 @@ el.filtroIndexador.addEventListener('change', applyFilters);
 el.filtroEmissorIncluir.addEventListener('change', applyFilters);
 el.filtroEmissorExcluir.addEventListener('change', applyFilters);
 </script>
+
+<script>
+(function(){
+  const _oldFetchCsv = fetchCsv;
+  const _oldEstimateSecondaryRate = estimateSecondaryRate;
+
+  function textNorm(v){
+    return String(v ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  }
+  function toDateMs(o){
+    if (!o) return NaN;
+    return new Date(o.y, o.m - 1, o.d).getTime();
+  }
+  function dateOnlyFromMs(ms){
+    if (!Number.isFinite(ms)) return null;
+    const d = new Date(ms);
+    return { y:d.getFullYear(), m:d.getMonth()+1, d:d.getDate() };
+  }
+  function recordQty(rec){
+    const q1 = toNumber(rec?.quantidade_aberta_historico);
+    if (Number.isFinite(q1) && q1 > 0) return q1;
+    const q2 = toNumber(rec?.quantidade_atual);
+    return (Number.isFinite(q2) && q2 > 0) ? q2 : NaN;
+  }
+  function recordCost(rec){
+    const c1 = toNumber(rec?.custo_aquisicao_total_aberto);
+    return Number.isFinite(c1) ? c1 : NaN;
+  }
+  function approxEq(a,b,tol=0.011){
+    return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a-b) <= tol;
+  }
+  function scoreCandidate(rec, broker, product, issuer){
+    let score = 0;
+    const brokerNorm = normalizeTextLoose(normalizeBroker(broker));
+    const recBroker = normalizeTextLoose(normalizeBroker(rec?.corretora_atual));
+    const prodNorm = normalizeTextLoose(product);
+    const issuerNorm = normalizeTextLoose(issuer);
+    const recProd = normalizeTextLoose(rec?.produto_painel);
+    const recIssuer = normalizeTextLoose(rec?.emissor_painel);
+    if (brokerNorm && recBroker === brokerNorm) score += 6;
+    if (prodNorm && recProd === prodNorm) score += 3;
+    if (issuerNorm && recIssuer === issuerNorm) score += 3;
+    if (prodNorm && recProd.includes(prodNorm)) score += 1;
+    if (issuerNorm && recIssuer.includes(issuerNorm)) score += 1;
+    return score;
+  }
+  function weightedAcqDate(records){
+    let num = 0, den = 0;
+    records.forEach(rec => {
+      const q = recordQty(rec);
+      const dt = rec?.data_aquisicao_media || rec?.data_primeira_aquisicao_aberta || rec?.data_ultima_aquisicao_aberta || null;
+      const ms = toDateMs(dt);
+      if (Number.isFinite(q) && q > 0 && Number.isFinite(ms)){
+        num += q * ms;
+        den += q;
+      }
+    });
+    return den > 0 ? dateOnlyFromMs(num / den) : null;
+  }
+  function aggregateRecords(records, mode='agregado'){
+    const usable = (records || []).filter(Boolean);
+    if (!usable.length) return null;
+    if (usable.length === 1){
+      return { ...usable[0], records: usable.slice(), match_mode: mode, match_count: 1 };
+    }
+    const qtySum = usable.reduce((a,r)=>a+(Number.isFinite(recordQty(r))?recordQty(r):0),0);
+    const costSum = usable.reduce((a,r)=>a+(Number.isFinite(recordCost(r))?recordCost(r):0),0);
+    const firstDates = usable.map(r => r.data_primeira_aquisicao_aberta || r.data_aquisicao_media).filter(Boolean).sort(compareDateOnly);
+    const lastDates = usable.map(r => r.data_ultima_aquisicao_aberta || r.data_aquisicao_media).filter(Boolean).sort(compareDateOnly);
+    const allRateLabels = usable.map(r => String(r.taxa_compra_secundario_label || r.taxa_compra_secundario || '').trim()).filter(Boolean);
+    return {
+      ...usable[0],
+      corretora_atual: usable.length === 1 ? usable[0].corretora_atual : 'MÚLTIPLAS',
+      quantidade_aberta_historico: qtySum,
+      custo_aquisicao_total_aberto: costSum,
+      pu_aquisicao_medio_aberto: (Number.isFinite(qtySum) && qtySum > 0 && Number.isFinite(costSum)) ? costSum / qtySum : NaN,
+      data_primeira_aquisicao_aberta: firstDates.length ? firstDates[0] : null,
+      data_ultima_aquisicao_aberta: lastDates.length ? lastDates[lastDates.length - 1] : null,
+      data_aquisicao_media: weightedAcqDate(usable),
+      lotes_abertos: usable.reduce((a,r)=>a+(Number.isFinite(toNumber(r.lotes_abertos))?toNumber(r.lotes_abertos):1),0),
+      detalhe_lotes_abertos: usable.map(r => r.detalhe_lotes_abertos).filter(Boolean).join(' || '),
+      status_posicao_compra: usable.map(r => r.status_posicao_compra).filter(Boolean).join(' | '),
+      taxa_compra_secundario_label: allRateLabels.length ? [...new Set(allRateLabels)][0] : '',
+      records: usable.slice(),
+      match_mode: mode,
+      match_count: usable.length
+    };
+  }
+  function chooseSubsetByQuantity(candidates, targetQty, broker, product, issuer){
+    if (!Number.isFinite(targetQty) || targetQty <= 0) return null;
+    const usable = (candidates || []).filter(r => Number.isFinite(recordQty(r)) && recordQty(r) > 0);
+    if (!usable.length) return null;
+    if (usable.length > 16) return null;
+    const scale = 100;
+    const target = Math.round(targetQty * scale);
+    const sorted = usable.slice().sort((a,b) => {
+      const ds = scoreCandidate(b, broker, product, issuer) - scoreCandidate(a, broker, product, issuer);
+      if (ds) return ds;
+      return recordQty(b) - recordQty(a);
+    });
+    let best = null;
+    function dfs(idx, chosen, qtyInt, brokerScore){
+      if (qtyInt > target + 1) return;
+      if (idx >= sorted.length){
+        const diff = Math.abs(qtyInt - target);
+        if (diff <= 1){
+          const cand = { diff, brokerScore, count: chosen.length, records: chosen.slice() };
+          if (!best ||
+              cand.diff < best.diff ||
+              (cand.diff === best.diff && cand.brokerScore > best.brokerScore) ||
+              (cand.diff === best.diff && cand.brokerScore === best.brokerScore && cand.count < best.count)){
+            best = cand;
+          }
+        }
+        return;
+      }
+      const rec = sorted[idx];
+      const qInt = Math.round(recordQty(rec) * scale);
+      const sc = scoreCandidate(rec, broker, product, issuer);
+      chosen.push(rec);
+      dfs(idx + 1, chosen, qtyInt + qInt, brokerScore + sc);
+      chosen.pop();
+      dfs(idx + 1, chosen, qtyInt, brokerScore);
+    }
+    dfs(0, [], 0, 0);
+    return best ? best.records : null;
+  }
+  function normalizeRateLabel(label){
+    return String(label ?? '')
+      .replace(/\s+/g,' ')
+      .replace(/\s+do\s+CDI/i, '% CDI')
+      .replace(/\s+CDI/i, '% CDI')
+      .replace(/%%/g,'%')
+      .trim();
+  }
+  function parseExplicitRate(label){
+    const raw = normalizeRateLabel(label);
+    if (!raw) return null;
+    let m = raw.match(/IPCA\s*\+\s*([0-9.,]+)/i);
+    if (m) return { kind:'IPCA', raw: toNumber(m[1]), label: raw };
+    m = raw.match(/([0-9.,]+)\s*%\s*(?:DO\s+)?CDI/i);
+    if (m) return { kind:'DI', raw: toNumber(m[1]), label: raw };
+    m = raw.match(/([0-9.,]+)\s*%\s*a\.a\./i);
+    if (m) return { kind:'PREFIXADO', raw: toNumber(m[1]), label: raw };
+    return { kind:'TEXT', raw: NaN, label: raw };
+  }
+  function formatExplicitRate(kind, raw){
+    if (!Number.isFinite(raw)) return { label:'-', raw:NaN };
+    if (kind === 'DI') return { label: `${brNumber(raw, 2)}% CDI`, raw };
+    if (kind === 'PREFIXADO') return { label: `${brNumber(raw, 2)}% a.a.`, raw };
+    if (kind === 'IPCA') return { label: `IPCA + ${brNumber(raw, 2)}%`, raw };
+    return { label: String(raw), raw };
+  }
+  function explicitRateFromRecords(records){
+    const usable = (records || []).filter(Boolean);
+    if (!usable.length) return null;
+    const parsed = usable
+      .map(r => ({ info: parseExplicitRate(r.taxa_compra_secundario_label || r.taxa_compra_secundario || ''), q: recordQty(r) }))
+      .filter(x => x.info && x.info.label);
+    if (!parsed.length) return null;
+    const uniqueLabels = [...new Set(parsed.map(x => x.info.label))];
+    if (uniqueLabels.length === 1) {
+      const first = parsed[0].info;
+      if (first.kind === 'TEXT') return { label:first.label, raw:NaN };
+      const totalQ = parsed.reduce((a,x)=>a+(Number.isFinite(x.q)&&x.q>0?x.q:1),0);
+      const avg = parsed.reduce((a,x)=>a+((Number.isFinite(x.q)&&x.q>0?x.q:1) * (Number.isFinite(x.info.raw)?x.info.raw:0)),0) / (totalQ || 1);
+      return formatExplicitRate(first.kind, avg);
+    }
+    const sameKind = parsed.every(x => x.info.kind === parsed[0].info.kind && x.info.kind !== 'TEXT' && Number.isFinite(x.info.raw));
+    if (sameKind) {
+      const totalQ = parsed.reduce((a,x)=>a+(Number.isFinite(x.q)&&x.q>0?x.q:1),0);
+      const avg = parsed.reduce((a,x)=>a+((Number.isFinite(x.q)&&x.q>0?x.q:1) * x.info.raw),0) / (totalQ || 1);
+      return formatExplicitRate(parsed[0].info.kind, avg);
+    }
+    return { label: uniqueLabels.slice(0,3).join(' / '), raw:NaN };
+  }
+
+  fetchCsv = async function(path, optional=false){
+    const busted = `${path}${path.includes('?') ? '&' : '?'}v=${Date.now()}`;
+    const resp = await fetch(busted, {
+      cache:'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+    });
+    if (!resp.ok){
+      if (optional) return [];
+      throw new Error(`Não foi possível carregar ${path}`);
+    }
+    return parseCSV(await resp.text());
+  };
+
+  prepareCompras = function(rows){
+    return rows.map(r => ({
+      codigo: String(r.codigo ?? '').trim(),
+      corretora_atual: normalizeBroker(r.corretora_atual),
+      produto_painel: r.produto_painel ?? '',
+      emissor_painel: r.emissor_painel ?? '',
+      data_aquisicao_media: dateOnlyFromString(r.data_aquisicao_media || r.data_primeira_aquisicao_aberta || ''),
+      data_primeira_aquisicao_aberta: dateOnlyFromString(r.data_primeira_aquisicao_aberta || ''),
+      data_ultima_aquisicao_aberta: dateOnlyFromString(r.data_ultima_aquisicao_aberta || ''),
+      quantidade_atual: toNumber(r.quantidade_atual),
+      quantidade_aberta_historico: toNumber(r.quantidade_aberta_historico),
+      custo_aquisicao_total_aberto: toNumber(r.custo_aquisicao_total_aberto),
+      pu_aquisicao_medio_aberto: toNumber(r.pu_aquisicao_medio_aberto),
+      lotes_abertos: toNumber(r.lotes_abertos),
+      detalhe_lotes_abertos: r.detalhe_lotes_abertos ?? '',
+      status_posicao_compra: r.status_posicao_compra ?? '',
+      taxa_compra_secundario_label: String(r.taxa_compra_secundario_label || r.taxa_compra_secundario || '').trim(),
+      fonte_taxa_compra_secundario: String(r.fonte_taxa_compra_secundario || '').trim()
+    })).filter(r => r.codigo);
+  };
+
+  matchAcq = function(code, broker, product='', issuer='', targetQty=NaN, targetValue=NaN){
+    const brokerKey = `${code}||${normalizeBroker(broker)}`;
+    const exact = state.comprasMap.get(brokerKey);
+    const allCandidates = (state.comprasByCode.get(code) || []).filter(Boolean);
+    if (!allCandidates.length) return { record:null, mode:'sem_match' };
+
+    const refined = allCandidates.slice().sort((a,b) =>
+      scoreCandidate(b, broker, product, issuer) - scoreCandidate(a, broker, product, issuer)
+    );
+
+    if (exact && (!Number.isFinite(targetQty) || approxEq(recordQty(exact), targetQty))) {
+      return { record: aggregateRecords([exact], 'codigo_corretora_exato'), mode:'codigo_corretora_exato' };
+    }
+
+    if (Number.isFinite(targetQty) && targetQty > 0){
+      const singleExact = refined.find(r => approxEq(recordQty(r), targetQty));
+      if (singleExact) {
+        return { record: aggregateRecords([singleExact], 'codigo_quantidade_exata'), mode:'codigo_quantidade_exata' };
+      }
+      const totalQty = refined.reduce((a,r)=>a+(Number.isFinite(recordQty(r))?recordQty(r):0),0);
+      if (approxEq(totalQty, targetQty)) {
+        return { record: aggregateRecords(refined, 'codigo_agregado_total'), mode:'codigo_agregado_total' };
+      }
+      const subset = chooseSubsetByQuantity(refined, targetQty, broker, product, issuer) || chooseSubsetByQuantity(allCandidates, targetQty, broker, product, issuer);
+      if (subset && subset.length) {
+        return { record: aggregateRecords(subset, 'codigo_subconjunto_quantidade'), mode:'codigo_subconjunto_quantidade' };
+      }
+    }
+
+    if (exact) return { record: aggregateRecords([exact], 'codigo_corretora_parcial'), mode:'codigo_corretora_parcial' };
+    if (refined.length === 1) return { record: aggregateRecords([refined[0]], 'codigo_unico'), mode:'codigo_unico' };
+    return { record: aggregateRecords([refined[0]], 'codigo_refinado'), mode:'codigo_refinado' };
+  };
+
+  estimateSecondaryRate = function(row, acq, dfCdi, dfIpca){
+    if (acq && acq.records && acq.records.length){
+      const explicit = explicitRateFromRecords(acq.records);
+      if (explicit && explicit.label) return explicit;
+    }
+    if (acq && (acq.taxa_compra_secundario_label || acq.taxa_compra_secundario)) {
+      const explicit = explicitRateFromRecords([acq]);
+      if (explicit && explicit.label) return explicit;
+    }
+    return _oldEstimateSecondaryRate(row, acq, dfCdi, dfIpca);
+  };
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const helper = document.querySelector('.helper-note');
+    if (helper && !helper.textContent.includes('taxa explícita')){
+      helper.textContent += ' A taxa de compra secundário agora prioriza a taxa explícita vinda do CSV de compras quando houver; sem isso, usa o cálculo implícito como fallback.';
+    }
+    const heroP = document.querySelector('.hero p');
+    if (heroP){
+      heroP.innerHTML = heroP.innerHTML.replace(
+        'O custo de aquisição continua sendo casado por <strong>código + corretora</strong>',
+        'O custo de aquisição prioriza <strong>código + corretora</strong>, mas também agrega lotes do mesmo código quando a quantidade da posição exigir'
+      );
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
