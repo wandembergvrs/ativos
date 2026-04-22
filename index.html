@@ -110,7 +110,7 @@
     </p>
     <div>
       <span class="pill">Data de referência editável</span>
-      <span class="pill">Match por código + corretora com validação por quantidade</span>
+      <span class="pill">Match por código com validação por quantidade e valor</span>
       <span class="pill">Composição ponderada ao longo do tempo</span>
       <span class="pill">Bruto x líquido</span>
       <span class="pill">CSV de ativos sem custo</span>
@@ -2107,13 +2107,43 @@ function findQuantityMatchingSubset(records, targetQty){
   if (bestMask === null) return null;
   return records.filter((_, i) => (bestMask & (1 << i)) !== 0);
 }
-function matchAcq(code, broker, quantity, product='', issuer=''){
+
+function findValueMatchingSubset(records, targetValue){
+  if (!records || !records.length || !Number.isFinite(targetValue) || targetValue <= 0) return null;
+  const n = records.length;
+  if (n > 12) return null;
+  let bestMask = null;
+  let bestCount = Infinity;
+  let bestDiff = Infinity;
+  const toleranceAbs = Math.max(5, targetValue * 0.02);
+  for (let mask = 1; mask < (1 << n); mask++) {
+    let total = 0;
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) {
+        total += Number.isFinite(records[i].valor_curva_atual) ? records[i].valor_curva_atual : 0;
+        count += 1;
+      }
+    }
+    const diff = Math.abs(total - targetValue);
+    if (diff <= toleranceAbs) {
+      if (count < bestCount || (count === bestCount && diff < bestDiff)) {
+        bestMask = mask;
+        bestCount = count;
+        bestDiff = diff;
+      }
+    }
+  }
+  if (bestMask === null) return null;
+  return records.filter((_, i) => (bestMask & (1 << i)) !== 0);
+}
+function matchAcq(code, broker, quantity, currentValue, product='', issuer=''){
   const brokerKey = `${code}||${normalizeBroker(broker)}`;
   const exact = state.comprasMap.get(brokerKey);
   const candidates = state.comprasByCode.get(code) || [];
   if (!candidates.length) return { record: null, mode: 'sem_match' };
 
-  if (exact && (!Number.isFinite(quantity) || approxEqual(exact.quantidade_aberta_historico, quantity, 1e-4))) {
+  if (exact && Number.isFinite(quantity) && approxEqual(exact.quantidade_aberta_historico, quantity, 1e-4)) {
     return { record: exact, mode: 'codigo_corretora' };
   }
 
@@ -2128,6 +2158,21 @@ function matchAcq(code, broker, quantity, product='', issuer=''){
       return {
         record: aggregateAcqRecords(exactSubset, normalizeBroker(broker)),
         mode: 'codigo_agregado_quantidade'
+      };
+    }
+  }
+
+  if (Number.isFinite(currentValue)) {
+    const valueSubset = findValueMatchingSubset(candidates, currentValue);
+    if (valueSubset && valueSubset.length) {
+      if (valueSubset.length === 1) {
+        const only = valueSubset[0];
+        const mode = normalizeBroker(only.corretora_atual) === normalizeBroker(broker) ? 'codigo_corretora_valor' : 'codigo_valor';
+        return { record: only, mode };
+      }
+      return {
+        record: aggregateAcqRecords(valueSubset, normalizeBroker(broker)),
+        mode: 'codigo_agregado_valor'
       };
     }
   }
@@ -2222,7 +2267,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
           cdi: cdiRefDate,
           ipca: ipcaRefDate
         });
-        const acqMatch = matchAcq(row['Código'], row['Instituição'], row['_quantidadeBase'], row['Produto'], row['Emissor']);
+        const acqMatch = matchAcq(row['Código'], row['Instituição'], row['_quantidadeBase'], row['Valor Atualizado CURVA'], row['Produto'], row['Emissor']);
         const acq = acqMatch.record;
         const acquisitionDate = acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null;
         const acquisitionCost = acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : NaN;
