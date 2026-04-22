@@ -114,6 +114,7 @@
       <span class="pill">Composição ponderada ao longo do tempo</span>
       <span class="pill">Bruto x líquido</span>
       <span class="pill">CSV de ativos sem custo</span>
+      <span class="pill">Versão v8 diagnóstico</span>
       <span class="pill">Match v7: agrega lotes por código antes do match por corretora quando a quantidade fecha</span>
     </div>
   </section>
@@ -198,6 +199,7 @@
       <button type="button" class="tab-btn" data-tab-target="posicoes">Posições</button>
       <button type="button" class="tab-btn" data-tab-target="composicao">Composição temporal</button>
       <button type="button" class="tab-btn" data-tab-target="vencimentos">Vencimentos</button>
+      <button type="button" class="tab-btn" id="tabDiagnosticoBtn" data-tab-target="diagnostico">Diagnóstico</button>
       <button type="button" class="tab-btn hidden" id="tabComparacaoBtn" data-tab-target="comparacao">Comparação</button>
     </div>
   </section>
@@ -306,6 +308,17 @@
       </table>
     </div>
   </section>
+
+  <section id="diagnosticoPanel" data-tab="diagnostico" class="card hidden tab-panel">
+    <h2>Diagnóstico de códigos duplicados e match de compras</h2>
+    <p class="panel-intro">Mostra, para cada código com mais de um registro no arquivo de compras ou com duplicidade na posição, quais lotes foram usados no custo de aquisição e quais ficaram de fora.</p>
+    <div class="table-wrap">
+      <table id="tabelaDiagnostico" class="mini-table">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -328,7 +341,8 @@ const state = {
   ipcaRefDate: null,
   activeTab: 'resumo',
   comparisonRows: [],
-  comparisonMeta: null
+  comparisonMeta: null,
+  diagnosticsRows: []
 };
 
 const TABLE_COLUMNS = [
@@ -406,7 +420,11 @@ const el = {
   comparacaoPanel: document.getElementById('comparacaoPanel'),
   comparacaoResumo: document.getElementById('comparacaoResumo'),
   tabelaComparacaoHead: document.querySelector('#tabelaComparacao thead'),
-  tabelaComparacaoBody: document.querySelector('#tabelaComparacao tbody')
+  tabelaComparacaoBody: document.querySelector('#tabelaComparacao tbody'),
+  tabDiagnosticoBtn: document.getElementById('tabDiagnosticoBtn'),
+  diagnosticoPanel: document.getElementById('diagnosticoPanel'),
+  tabelaDiagnosticoHead: document.querySelector('#tabelaDiagnostico thead'),
+  tabelaDiagnosticoBody: document.querySelector('#tabelaDiagnostico tbody')
 };
 
 function setStatus(t){ el.status.textContent = t || ''; }
@@ -1115,6 +1133,7 @@ function applyFilters(){
   renderMainTable(rows);
   renderCronograma(rows);
   renderComposition(rows);
+  renderDiagnostics(rows);
   updateMissingCostButtonState();
   showTabbedPanels();
 }
@@ -1833,6 +1852,7 @@ function applyFilters(){
   renderMainTable(rows);
   renderCronograma(rows);
   renderComposition(rows);
+  renderDiagnostics(rows);
   updateMissingCostButtonState();
   showTabbedPanels();
 }
@@ -2020,8 +2040,11 @@ function clearAll(){
   if (el.tabComparacaoBtn) el.tabComparacaoBtn.classList.add('hidden');
   if (el.comparacaoPanel) el.comparacaoPanel.classList.add('hidden');
   if (el.comparacaoResumo) el.comparacaoResumo.innerHTML='';
+  if (el.diagnosticoPanel) el.diagnosticoPanel.classList.add('hidden');
   if (el.tabelaComparacaoHead) el.tabelaComparacaoHead.innerHTML='';
   if (el.tabelaComparacaoBody) el.tabelaComparacaoBody.innerHTML='';
+  if (el.tabelaDiagnosticoHead) el.tabelaDiagnosticoHead.innerHTML='';
+  if (el.tabelaDiagnosticoBody) el.tabelaDiagnosticoBody.innerHTML='';
   el.sumario.classList.add('hidden');
   el.filtros.classList.add('hidden');
   el.composicaoTemporal.classList.add('hidden');
@@ -2041,6 +2064,7 @@ function clearAll(){
   setComputerDateDisplay();
   setStatus('');
   setCompareStatus('');
+  state.diagnosticsRows = [];
 }
 function matchAcq(code, broker, product='', issuer=''){
   const brokerKey = `${code}||${normalizeBroker(broker)}`;
@@ -2138,12 +2162,12 @@ el.btnProcessar.addEventListener('click', async ()=>{
           cdi: cdiRefDate,
           ipca: ipcaRefDate
         });
-        const acqMatch = matchAcq(row['Código'], row['Instituição'], row['Produto'], row['Emissor'], row['_quantidadeBase'], row['Valor Atualizado CURVA']);
+        const acqMatch = matchAcqRobust(row['Código'], row['Instituição'], row['Produto'], row['Emissor'], row['_quantidadeBase'], row['Valor Atualizado CURVA']);
         const acq = acqMatch.record;
         const acquisitionDate = acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null;
         const acquisitionCost = acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : NaN;
         const taxProfile = getTaxProfile({ 'Produto painel': row['Produto'], 'Código': row['Código'] });
-        const secRate = estimateSecondaryRate(row, acq, dfCdi, dfIpca);
+        const secRate = estimateSecondaryRateV8(row, acq, dfCdi, dfIpca);
         const v12Mat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, true);
         const v12NoMat = project12m(row, panelRate, requestedRef, cdiFuture, ipcaFuture, false);
         const proxyTaxBase = (!Number.isFinite(acquisitionCost) && !acquisitionDate)
@@ -2215,6 +2239,9 @@ el.btnProcessar.addEventListener('click', async ()=>{
           '_tipoComposicao': getFixType(row['Indexador']),
           '_origemValorAtualizado': row['_origemValorAtualizado'] || 'CURVA',
           '_costMatchMode': acqMatch.mode,
+          '_costMatchRecords': acq && acq.records ? acq.records.map(r => makeRecordKey(r)) : [],
+          '_costMatchDetail': acq && acq.records ? acq.records.map(r => recordSummaryText(r)).join(' || ') : '',
+          '_costMatchCandidateCount': (state.comprasByCode.get(row['Código']) || []).length,
           '_taxType': taxProfile.type,
           '_taxHasAcquisitionDate': !!acquisitionDate,
           '_taxProxyUsed': !!proxyTaxBase,
@@ -2243,6 +2270,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const cdb325 = result.find(r => r['Código'] === 'CDB325C2TBT');
     setStatus(
       `Processamento concluído.\n` +
+      `Versão do painel: v8-diagnostico\n` +
       `Aba usada: ${actualSheet}\n` +
       `Data do computador usada no painel: ${formatDate(requestedRef)}\n` +
       `Data da planilha inferida pelo nome: ${positionDateHint ? formatDate(positionDateHint) : '-'}\n` +
@@ -2261,7 +2289,8 @@ el.btnProcessar.addEventListener('click', async ()=>{
 ` +
       `Linhas com código duplicado: ${result.filter(r => r['_codigoDuplicado']).length}
 ` +
-      `Linhas com IR na maior faixa por falta de data de aquisição: ${result.filter(r => r['_taxConservativeIr']).length}`
+      `Linhas com IR na maior faixa por falta de data de aquisição: ${result.filter(r => r['_taxConservativeIr']).length}` +
+      (cdb325 ? `\nCDB325C2TBT => modo: ${cdb325['_costMatchMode'] || '-'} | custo: R$ ${brNumber(cdb325['Custo aquisição'])} | detalhe: ${cdb325['_costMatchDetail'] || '-'}` : '')
     );
   } catch(err){
     console.error(err);
@@ -2488,7 +2517,156 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
     return { label: uniqueLabels.slice(0,3).join(' / '), raw:NaN };
   }
 
-  fetchCsv = async function(path, optional=false){
+
+  function makeRecordKey(rec){
+    if (!rec) return '';
+    return [
+      String(rec.codigo || '').trim(),
+      normalizeBroker(rec.corretora_atual),
+      String(recordQty(rec)),
+      String(recordCost(rec)),
+      dateOnlyToKey(rec.data_aquisicao_media || rec.data_primeira_aquisicao_aberta || rec.data_ultima_aquisicao_aberta || null)
+    ].join('||');
+  }
+  function recordSummaryText(rec){
+    if (!rec) return '';
+    const parts = [];
+    parts.push(normalizeBroker(rec.corretora_atual || ''));
+    const q = recordQty(rec);
+    const c = recordCost(rec);
+    if (Number.isFinite(q)) parts.push(`q=${brNumber(q, 2)}`);
+    if (Number.isFinite(c)) parts.push(`custo=R$ ${brNumber(c)}`);
+    if (rec.data_aquisicao_media || rec.data_primeira_aquisicao_aberta) parts.push(`data=${formatDate(rec.data_aquisicao_media || rec.data_primeira_aquisicao_aberta)}`);
+    if (rec.taxa_compra_secundario_label) parts.push(`taxa=${rec.taxa_compra_secundario_label}`);
+    return parts.join(' | ');
+  }
+  function matchAcqRobust(code, broker, product='', issuer='', targetQty=NaN, targetValue=NaN){
+    const allCandidates = (state.comprasByCode.get(code) || []).filter(Boolean);
+    if (!allCandidates.length) return { record:null, mode:'sem_match' };
+    const brokerNorm = normalizeTextLoose(normalizeBroker(broker));
+    const brokerCandidates = allCandidates.filter(r => normalizeTextLoose(normalizeBroker(r.corretora_atual)) === brokerNorm);
+    const refined = allCandidates.slice().sort((a,b) =>
+      scoreCandidate(b, broker, product, issuer) - scoreCandidate(a, broker, product, issuer)
+    );
+
+    if (Number.isFinite(targetQty) && targetQty > 0){
+      const totalQtyAll = allCandidates.reduce((a,r)=>a+(Number.isFinite(recordQty(r)) ? recordQty(r) : 0),0);
+      if (allCandidates.length > 1 && approxEq(totalQtyAll, targetQty)) {
+        return { record: aggregateRecords(allCandidates, 'codigo_agregado_total_prioritario'), mode:'codigo_agregado_total_prioritario' };
+      }
+
+      const totalQtyBroker = brokerCandidates.reduce((a,r)=>a+(Number.isFinite(recordQty(r)) ? recordQty(r) : 0),0);
+      if (brokerCandidates.length > 1 && approxEq(totalQtyBroker, targetQty)) {
+        return { record: aggregateRecords(brokerCandidates, 'codigo_agregado_corretora'), mode:'codigo_agregado_corretora' };
+      }
+
+      const totalQtyRefined = refined.reduce((a,r)=>a+(Number.isFinite(recordQty(r)) ? recordQty(r) : 0),0);
+      if (refined.length > 1 && approxEq(totalQtyRefined, targetQty)) {
+        return { record: aggregateRecords(refined, 'codigo_agregado_total_refinado'), mode:'codigo_agregado_total_refinado' };
+      }
+
+      const brokerExact = brokerCandidates.find(r => approxEq(recordQty(r), targetQty));
+      if (brokerExact) {
+        return { record: aggregateRecords([brokerExact], 'codigo_corretora_exato'), mode:'codigo_corretora_exato' };
+      }
+
+      const singleExact = refined.find(r => approxEq(recordQty(r), targetQty));
+      if (singleExact) {
+        return { record: aggregateRecords([singleExact], 'codigo_quantidade_exata'), mode:'codigo_quantidade_exata' };
+      }
+
+      const subset = chooseSubsetByQuantity(refined, targetQty, broker, product, issuer) || chooseSubsetByQuantity(allCandidates, targetQty, broker, product, issuer);
+      if (subset && subset.length) {
+        return { record: aggregateRecords(subset, 'codigo_subconjunto_quantidade'), mode:'codigo_subconjunto_quantidade' };
+      }
+    }
+
+    if (brokerCandidates.length === 1) return { record: aggregateRecords([brokerCandidates[0]], 'codigo_corretora_parcial'), mode:'codigo_corretora_parcial' };
+    if (brokerCandidates.length > 1) return { record: aggregateRecords(brokerCandidates, 'codigo_corretora_multiplos'), mode:'codigo_corretora_multiplos' };
+    if (refined.length === 1) return { record: aggregateRecords([refined[0]], 'codigo_unico'), mode:'codigo_unico' };
+    return { record: aggregateRecords([refined[0]], 'codigo_refinado'), mode:'codigo_refinado' };
+  }
+  function estimateSecondaryRateV8(row, acq, dfCdi, dfIpca){
+    if (acq && acq.records && acq.records.length){
+      const explicit = explicitRateFromRecords(acq.records);
+      if (explicit && explicit.label) return explicit;
+    }
+    return estimateSecondaryRate(row, acq, dfCdi, dfIpca);
+  }
+  function buildDiagnosticsRows(rows){
+    const out = [];
+    const seen = new Set();
+    rows.forEach(r => {
+      const code = r['Código'];
+      if (seen.has(code)) return;
+      seen.add(code);
+      const candidates = (state.comprasByCode.get(code) || []).filter(Boolean);
+      const needs = candidates.length > 1 || !!r['_codigoDuplicado'];
+      if (!needs) return;
+      const selected = new Set((r['_costMatchRecords'] || []).map(String));
+      if (!candidates.length){
+        out.push({
+          codigo: code,
+          corretoraPainel: r['Corretora painel'],
+          qtdPainel: r['_quantidadeBase'],
+          matchMode: r['_costMatchMode'] || 'sem_match',
+          candidatoCorretora: '-',
+          candidatoQtd: NaN,
+          candidatoCusto: NaN,
+          candidatoTaxa: '-',
+          statusLinha: 'SEM REGISTRO',
+          detalhe: 'Sem registros no arquivo de compras'
+        });
+        return;
+      }
+      candidates.forEach(c => {
+        const key = makeRecordKey(c);
+        out.push({
+          codigo: code,
+          corretoraPainel: r['Corretora painel'],
+          qtdPainel: r['_quantidadeBase'],
+          matchMode: r['_costMatchMode'] || '-',
+          candidatoCorretora: normalizeBroker(c.corretora_atual),
+          candidatoQtd: recordQty(c),
+          candidatoCusto: recordCost(c),
+          candidatoTaxa: c.taxa_compra_secundario_label || '-',
+          statusLinha: selected.has(key) ? 'REGISTRADA' : 'NÃO REGISTRADA',
+          detalhe: recordSummaryText(c)
+        });
+      });
+    });
+    return out;
+  }
+  function renderDiagnostics(rows){
+    if (!el.diagnosticoPanel || !el.tabelaDiagnosticoHead || !el.tabelaDiagnosticoBody) return;
+    const diagRows = buildDiagnosticsRows(rows);
+    state.diagnosticsRows = diagRows;
+    if (!diagRows.length){
+      el.diagnosticoPanel.classList.add('hidden');
+      el.tabelaDiagnosticoHead.innerHTML = '';
+      el.tabelaDiagnosticoBody.innerHTML = '';
+      return;
+    }
+    el.diagnosticoPanel.classList.remove('hidden');
+    const cols = ['Código','Corretora painel','Qtd painel','Modo de match','Corretora do registro','Qtd do registro','Custo do registro','Taxa do registro','Status','Detalhe'];
+    el.tabelaDiagnosticoHead.innerHTML = `<tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
+    el.tabelaDiagnosticoBody.innerHTML = diagRows.map(r => `<tr>
+      <td>${escapeHtml(r.codigo)}</td>
+      <td>${escapeHtml(r.corretoraPainel || '-')}</td>
+      <td class="right">${Number.isFinite(r.qtdPainel) ? brNumber(r.qtdPainel,2) : '-'}</td>
+      <td>${escapeHtml(r.matchMode || '-')}</td>
+      <td>${escapeHtml(r.candidatoCorretora || '-')}</td>
+      <td class="right">${Number.isFinite(r.candidatoQtd) ? brNumber(r.candidatoQtd,2) : '-'}</td>
+      <td class="right">${Number.isFinite(r.candidatoCusto) ? `R$ ${brNumber(r.candidatoCusto)}` : '-'}</td>
+      <td>${escapeHtml(r.candidatoTaxa || '-')}</td>
+      <td>${escapeHtml(r.statusLinha)}</td>
+      <td>${escapeHtml(r.detalhe || '-')}</td>
+    </tr>`).join('');
+  }
+
+
+
+    fetchCsv = async function(path, optional=false){
     const busted = `${path}${path.includes('?') ? '&' : '?'}v=${Date.now()}`;
     const resp = await fetch(busted, {
       cache:'no-store',
