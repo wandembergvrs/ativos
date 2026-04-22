@@ -106,11 +106,11 @@
       Envie a planilha de posição. O site usa automaticamente <code>serie_cdi.csv</code>,
       <code>serie_ipca.csv</code> e o arquivo <code>compras_secundario.csv</code> do repositório.
       Agora a data de referência pode ser definida pelo usuário, iniciando por padrão na data do dia.
-      O custo de aquisição continua sendo casado por <strong>código + corretora</strong>, e o painel também passa a mostrar a composição ponderada de <strong>prefixados x pós-fixados</strong> ao longo do tempo, além de valores <strong>brutos e líquidos</strong> na posição e nas projeções.
+      O custo de aquisição é casado preferencialmente por <strong>código + corretora</strong>, mas agora também agrega lotes do mesmo código quando a <strong>quantidade atual</strong> indicar que houve consolidação entre corretoras. O painel também mostra a composição ponderada de <strong>prefixados x pós-fixados</strong> ao longo do tempo, além de valores <strong>brutos e líquidos</strong> na posição e nas projeções.
     </p>
     <div>
       <span class="pill">Data de referência editável</span>
-      <span class="pill">Match por código + corretora</span>
+      <span class="pill">Match por código + corretora com validação por quantidade</span>
       <span class="pill">Composição ponderada ao longo do tempo</span>
       <span class="pill">Bruto x líquido</span>
       <span class="pill">CSV de ativos sem custo</span>
@@ -2041,13 +2041,98 @@ function clearAll(){
   setStatus('');
   setCompareStatus('');
 }
-function matchAcq(code, broker, product='', issuer=''){
+function approxEqual(a, b, tol = 1e-6){
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol;
+}
+function aggregateAcqRecords(records, brokerHint=''){
+  if (!records || !records.length) return null;
+  if (records.length === 1) return records[0];
+  const first = records[0];
+  const qtyTotal = records.reduce((acc, r) => acc + (Number.isFinite(r.quantidade_aberta_historico) ? r.quantidade_aberta_historico : 0), 0);
+  const costTotal = records.reduce((acc, r) => acc + (Number.isFinite(r.custo_aquisicao_total_aberto) ? r.custo_aquisicao_total_aberto : 0), 0);
+  const weightedDateTs = records.reduce((acc, r) => {
+    const w = Number.isFinite(r.quantidade_aberta_historico) && r.quantidade_aberta_historico > 0 ? r.quantidade_aberta_historico : 0;
+    const d = r.data_aquisicao_media || r.data_primeira_aquisicao_aberta || r.data_ultima_aquisicao_aberta;
+    if (!w || !d) return acc;
+    return acc + (new Date(d.y, d.m - 1, d.d).getTime() * w);
+  }, 0);
+  const weightedDate = qtyTotal > 0 && weightedDateTs > 0 ? (() => {
+    const dt = new Date(weightedDateTs / qtyTotal);
+    return { y: dt.getFullYear(), m: dt.getMonth() + 1, d: dt.getDate() };
+  })() : (first.data_aquisicao_media || first.data_primeira_aquisicao_aberta || null);
+
+  return {
+    ...first,
+    corretora_atual: brokerHint || first.corretora_atual,
+    data_primeira_aquisicao_aberta: records
+      .map(r => r.data_primeira_aquisicao_aberta || r.data_aquisicao_media || r.data_ultima_aquisicao_aberta)
+      .filter(Boolean)
+      .sort(compareDateOnly)[0] || null,
+    data_ultima_aquisicao_aberta: records
+      .map(r => r.data_ultima_aquisicao_aberta || r.data_aquisicao_media || r.data_primeira_aquisicao_aberta)
+      .filter(Boolean)
+      .sort(compareDateOnly)
+      .slice(-1)[0] || null,
+    data_aquisicao_media: weightedDate,
+    quantidade_aberta_historico: qtyTotal,
+    custo_aquisicao_total_aberto: costTotal,
+    pu_aquisicao_medio_aberto: qtyTotal > 0 ? costTotal / qtyTotal : NaN,
+    lotes_abertos: records.reduce((acc, r) => acc + (Number.isFinite(r.lotes_abertos) ? r.lotes_abertos : 0), 0),
+    detalhe_lotes_abertos: records.map(r => r.detalhe_lotes_abertos).filter(Boolean).join(' || '),
+    status_posicao_compra: 'agregado_por_codigo'
+  };
+}
+function findQuantityMatchingSubset(records, targetQty){
+  if (!records || !records.length || !Number.isFinite(targetQty) || targetQty <= 0) return null;
+  const n = records.length;
+  if (n > 12) return null;
+  let bestMask = null;
+  let bestCount = Infinity;
+  for (let mask = 1; mask < (1 << n); mask++) {
+    let qty = 0;
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) {
+        qty += Number.isFinite(records[i].quantidade_aberta_historico) ? records[i].quantidade_aberta_historico : 0;
+        count += 1;
+      }
+    }
+    if (approxEqual(qty, targetQty, 1e-4)) {
+      if (count < bestCount) {
+        bestMask = mask;
+        bestCount = count;
+      }
+    }
+  }
+  if (bestMask === null) return null;
+  return records.filter((_, i) => (bestMask & (1 << i)) !== 0);
+}
+function matchAcq(code, broker, quantity, product='', issuer=''){
   const brokerKey = `${code}||${normalizeBroker(broker)}`;
   const exact = state.comprasMap.get(brokerKey);
-  if (exact) return { record: exact, mode: 'codigo_corretora' };
-
   const candidates = state.comprasByCode.get(code) || [];
   if (!candidates.length) return { record: null, mode: 'sem_match' };
+
+  if (exact && (!Number.isFinite(quantity) || approxEqual(exact.quantidade_aberta_historico, quantity, 1e-4))) {
+    return { record: exact, mode: 'codigo_corretora' };
+  }
+
+  if (Number.isFinite(quantity)) {
+    const exactSubset = findQuantityMatchingSubset(candidates, quantity);
+    if (exactSubset && exactSubset.length) {
+      if (exactSubset.length === 1) {
+        const only = exactSubset[0];
+        const mode = normalizeBroker(only.corretora_atual) === normalizeBroker(broker) ? 'codigo_corretora' : 'codigo_quantidade';
+        return { record: only, mode };
+      }
+      return {
+        record: aggregateAcqRecords(exactSubset, normalizeBroker(broker)),
+        mode: 'codigo_agregado_quantidade'
+      };
+    }
+  }
+
+  if (exact) return { record: exact, mode: 'codigo_corretora_parcial' };
   if (candidates.length === 1) return { record: candidates[0], mode: 'codigo' };
 
   const productNorm = normalizeTextLoose(product);
@@ -2137,7 +2222,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
           cdi: cdiRefDate,
           ipca: ipcaRefDate
         });
-        const acqMatch = matchAcq(row['Código'], row['Instituição'], row['Produto'], row['Emissor']);
+        const acqMatch = matchAcq(row['Código'], row['Instituição'], row['_quantidadeBase'], row['Produto'], row['Emissor']);
         const acq = acqMatch.record;
         const acquisitionDate = acq ? (acq.data_aquisicao_media || acq.data_primeira_aquisicao_aberta) : null;
         const acquisitionCost = acq && Number.isFinite(acq.custo_aquisicao_total_aberto) ? acq.custo_aquisicao_total_aberto : NaN;
