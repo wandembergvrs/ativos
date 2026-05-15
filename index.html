@@ -104,7 +104,9 @@
     <h1>Painel de Renda Fixa com Corretora e Custo de Aquisição <span style="font-size:18px;color:#a8b3d1;">v11</span></h1>
     <p>
       Envie a planilha de posição. O site usa automaticamente <code>serie_cdi.csv</code>,
-      <code>serie_ipca.csv</code> e o arquivo <code>compras_secundario.csv</code> do repositório.
+      <code>serie_ipca.csv</code> e, quando disponível, <code>compras_secundario.csv</code>.
+      O CSV de compras é opcional: se ele não for enviado nem encontrado no repositório,
+      o painel continua processando a posição e marca os ativos como sem custo informado.
       Agora a data de referência pode ser definida pelo usuário, iniciando por padrão na data do dia.
       O custo de aquisição continua sendo casado por <strong>código + corretora</strong>, e o painel também passa a mostrar a composição ponderada de <strong>prefixados x pós-fixados</strong> ao longo do tempo, além de valores <strong>brutos e líquidos</strong> na posição e nas projeções.
     </p>
@@ -158,7 +160,7 @@
       </div>
       <div class="field">
         <label>Arquivos esperados no repositório</label>
-        <input type="text" disabled value="./serie_cdi.csv | ./serie_ipca.csv | ./compras_secundario.csv" />
+        <input type="text" disabled value="./serie_cdi.csv | ./serie_ipca.csv | ./compras_secundario.csv (opcional)" />
       </div>
     </div>
     <div class="actions">
@@ -278,7 +280,7 @@
         <tbody></tbody>
       </table>
     </div>
-    <div class="footer-note">A coluna de custo de aquisição usa o arquivo consolidado por código e corretora. Quando não houver histórico correspondente, o custo aparece zerado e o ativo pode ser exportado no CSV auxiliar.</div>
+    <div class="footer-note">A coluna de custo de aquisição usa o arquivo consolidado por código e corretora, quando disponível. Quando não houver arquivo de compras ou histórico correspondente, o custo aparece zerado e o ativo pode ser exportado no CSV auxiliar.</div>
   </section>
 
   <section id="vencimentosPanel" data-tab="vencimentos" class="grid grid-2 hidden tab-panel">
@@ -2284,7 +2286,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
     const cdb325 = result.find(r => r['Código'] === 'CDB325C2TBT');
     setStatus(
       `Processamento concluído.\n` +
-      `Versão do painel: v14-fix-quantidadebase\n` +
+      `Versão do painel: v15-compras-opcional\n` +
       `Aba usada: ${actualSheet}\n` +
       `Data do computador usada no painel: ${formatDate(requestedRef)}\n` +
       `Data da planilha inferida pelo nome: ${positionDateHint ? formatDate(positionDateHint) : '-'}\n` +
@@ -2293,7 +2295,7 @@ el.btnProcessar.addEventListener('click', async ()=>{
       `Data histórica IPCA usada: ${formatDate(ipcaRefDate)}\n` +
       `CDI projetado com última taxa disponível até a data-base: ${compareDateOnly(historicalRefWanted, cdiRefDate) > 0 ? 'sim' : 'não'}\n` +
       `Hora local do processamento: ${new Date().toLocaleString('pt-BR')}\n` +
-      `Fonte do CSV de compras: ${state.comprasSourceType === 'upload' ? 'upload manual' : 'busca automática'}\n` +
+      `Fonte do CSV de compras: ${state.comprasSourceType === 'upload' ? 'upload manual' : (state.comprasSourceType === 'missing' ? 'não informado (opcional)' : 'busca automática')}\n` +
       `Arquivo de compras usado: ${state.comprasSourceName || state.comprasCsvPath || '-'}\n` +
       `Linhas carregadas do CSV de compras: ${dfCompras.length}\n` +
       `Linhas exibidas no painel: ${result.length}
@@ -2713,13 +2715,24 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
         fileName: uploaded.name
       };
     }
-    const info = await fetchFirstCsv(['./compras_secundario.csv']);
-    return {
-      rows: info.rows,
-      path: info.path,
-      sourceType: 'fetch',
-      fileName: info.path
-    };
+
+    try {
+      const info = await fetchFirstCsv(['./compras_secundario.csv']);
+      return {
+        rows: info.rows,
+        path: info.path,
+        sourceType: 'fetch',
+        fileName: info.path
+      };
+    } catch (err) {
+      console.warn('[RF] compras_secundario.csv não encontrado. Continuando sem custo de aquisição.', err);
+      return {
+        rows: [],
+        path: '(não informado)',
+        sourceType: 'missing',
+        fileName: 'compras_secundario.csv ausente'
+      };
+    }
   }
 
   prepareCompras = function(rows){
@@ -2808,7 +2821,7 @@ el.filtroEmissorExcluir.addEventListener('change', applyFilters);
     const required = ['makeRecordKey','recordSummaryText','matchAcqRobust','estimateSecondaryRateV8','buildDiagnosticsRows','renderDiagnostics','loadComprasSource'];
     const missing = required.filter(name => typeof window[name] !== 'function');
     const quantityProbe = typeof preparePosicao === 'function';
-    return { version: 'v14-fix-quantidadebase', missing, quantityProbe };
+    return { version: 'v15-compras-opcional', missing, quantityProbe };
   };
 
   document.addEventListener('DOMContentLoaded', function(){
